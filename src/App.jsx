@@ -14,7 +14,7 @@ import { AnimatePresence, motion } from 'framer-motion';
 import { db, updateAllEventStatuses } from './db';
 import { useAppStore } from './store';
 import { initNotificationSystem } from './notifications';
-import { initFirebase, subscribeToEvents, getUserRole } from './services/firebase';
+import { initFirebase, subscribeToEvents, getUserData } from './services/firebase';
 import { onAuthStateChanged } from 'firebase/auth';
 
 // --- EAGERLY LOADED COMPONENTS (Essential for fast first paint) ---
@@ -34,11 +34,49 @@ const AddEventModal = lazy(() => import('./components/AddEventModal'));
 const ImportCSVModal = lazy(() => import('./components/ImportCSVModal'));
 const EventDetailsModal = lazy(() => import('./components/EventDetailsModal'));
 const EditEventModal = lazy(() => import('./components/EditEventModal'));
+const PaymentModal = lazy(() => import('./components/PaymentModal'));
+const TeamInviteModal = lazy(() => import('./components/TeamInviteModal'));
+const JoinTeam = lazy(() => import('./components/JoinTeam'));
+const FeedbackModal = lazy(() => import('./components/FeedbackModal'));
+const LegalModal = lazy(() => import('./components/LegalModal'));
 
 /**
  * 🔄 Animated Routes Container
  * Handles page transitions with Framer Motion.
  */
+
+class ErrorBoundary extends React.Component {
+    constructor(props) {
+        super(props);
+        this.state = { hasError: false, error: null, errorInfo: null };
+    }
+
+    static getDerivedStateFromError(error) {
+        return { hasError: true };
+    }
+
+    componentDidCatch(error, errorInfo) {
+        console.error("ErrorBoundary caught an error:", error, errorInfo);
+        this.setState({ error, errorInfo });
+    }
+
+    render() {
+        if (this.state.hasError) {
+            return (
+                <div style={{ padding: '20px', background: '#ffebee', color: '#c62828', fontFamily: 'monospace' }}>
+                    <h2>Something went wrong.</h2>
+                    <details style={{ whiteSpace: 'pre-wrap' }}>
+                        {this.state.error && this.state.error.toString()}
+                        <br />
+                        {this.state.errorInfo && this.state.errorInfo.componentStack}
+                    </details>
+                </div>
+            );
+        }
+        return this.props.children;
+    }
+}
+
 function AnimatedRoutes() {
     const location = useLocation();
     return (
@@ -50,6 +88,7 @@ function AnimatedRoutes() {
                 <Route path="/analytics" element={<Suspense fallback={null}><Analytics /></Suspense>} />
                 <Route path="/settings" element={<Suspense fallback={null}><Settings /></Suspense>} />
                 <Route path="/discovery" element={<Suspense fallback={null}><Discovery /></Suspense>} />
+                <Route path="/invite/:teamId" element={<Suspense fallback={null}><JoinTeam /></Suspense>} />
                 <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>
         </AnimatePresence>
@@ -63,10 +102,26 @@ function App() {
     const setUser = useAppStore((state) => state.setUser);
     const firebaseConfig = useAppStore((state) => state.firebaseConfig);
     const cloudProvider = useAppStore((state) => state.cloudProvider);
+    const userRole = useAppStore((state) => state.userRole);
+    const teamId = useAppStore((state) => state.teamId);
 
     // Local loading states
     const [isLoading, setIsLoading] = useState(true);
-    const [showSplash, setShowSplash] = useState(true); // Control Splash Visibility
+    const [showSplash, setShowSplash] = useState(true);
+
+    /**
+     * EFFECT: Safety Timeout
+     * Prevents the app from being stuck on a blank screen if Firebase hangs.
+     */
+    useEffect(() => {
+        const timer = setTimeout(() => {
+            if (isLoading) {
+                console.warn('[System] Loading took too long. Forcing start...');
+                setIsLoading(false);
+            }
+        }, 5000);
+        return () => clearTimeout(timer);
+    }, [isLoading]);
 
     /**
      * EFFECT: Apply Theme
@@ -86,32 +141,37 @@ function App() {
      */
     useEffect(() => {
         // Step 1: Initialize Firebase with the saved config
-        const firebaseData = initFirebase(firebaseConfig);
+        let unsubscribeAuth = () => { };
 
-        // Step 2: Listen for User Login / Logout changes
-        const unsubscribeAuth = firebaseData ? onAuthStateChanged(firebaseData.auth, async (firebaseUser) => {
-            setUser(firebaseUser); // Sync user status to the store
+        try {
+            const firebaseData = initFirebase(firebaseConfig);
 
-            // Step 2b: Fetch user role from Firestore on auto-login (new device/session restore)
-            if (firebaseUser) {
-                try {
-                    const role = await getUserRole(firebaseUser.uid);
-                    useAppStore.getState().setUserRole(role);
-                    console.log('[Auth] User role synced:', role);
-                } catch (err) {
-                    console.error('[Auth] Failed to fetch user role:', err);
-                }
+            // Step 2: Listen for User Login / Logout changes
+            if (firebaseData?.auth) {
+                unsubscribeAuth = onAuthStateChanged(firebaseData.auth, async (firebaseUser) => {
+                    console.log('[Auth] State changed. User:', firebaseUser?.email || 'None');
+                    setUser(firebaseUser); // Sync user status to the store
+
+                    if (firebaseUser) {
+                        try {
+                            const { role, teamId } = await getUserData(firebaseUser.uid);
+                            useAppStore.getState().setUserRole(role);
+                            useAppStore.getState().setTeamId(teamId);
+                        } catch (err) {
+                            console.error('[Auth] Failed to fetch user data:', err);
+                        }
+                    }
+                    setIsLoading(false);
+                });
+            } else {
+                setIsLoading(false);
             }
-
+        } catch (error) {
+            console.error('[Auth] Initialization crash:', error);
             setIsLoading(false);
-        }) : (() => {
-            setIsLoading(false);
-            return () => { };
-        })();
+        }
 
-        return () => {
-            if (unsubscribeAuth) unsubscribeAuth();
-        };
+        return () => unsubscribeAuth();
     }, [firebaseConfig, setUser]);
 
     /**
@@ -121,84 +181,95 @@ function App() {
     useEffect(() => {
         if (isLoading || !user || cloudProvider !== 'firestore') return;
 
-        // Re-retrieve the initialized instance (safe to call multiple times)
-        const firebaseData = initFirebase(firebaseConfig);
-        if (!firebaseData) return;
+        let unsubscribeSync = () => { };
 
-        console.log('[Sync] Starting real-time sync for user:', user.email);
+        try {
+            const firebaseData = initFirebase(firebaseConfig);
+            if (!firebaseData) return;
 
-        // Subscribe to cloud changes with error handling
-        const unsubscribeSync = subscribeToEvents(
-            async (remoteEvents) => {
-                console.log(`[Sync] Received ${remoteEvents.length} events from cloud.`);
-                const { bulkImportEvents } = await import('./db');
-                // When cloud data changes, update our local browser database
-                // overwrite: true ensures local DB mirrors the cloud exactly
-                await bulkImportEvents(remoteEvents, true);
-            },
-            (error) => {
-                console.error('[Sync] Firestore listener failed:', error.message);
-                // If permission denied, the user might need to re-login
-                if (error.code === 'permission-denied') {
-                    console.warn('[Sync] Permission denied. User may need to re-authenticate.');
-                }
-            }
-        );
+            console.log('[Sync] Starting real-time sync...');
 
-        return () => {
-            if (unsubscribeSync) unsubscribeSync();
-        };
-    }, [isLoading, user, cloudProvider, firebaseConfig]);
+            unsubscribeSync = subscribeToEvents(
+                async (remoteEvents) => {
+                    const { bulkImportEvents } = await import('./db');
+                    await bulkImportEvents(remoteEvents, true);
+                },
+                (error) => {
+                    console.error('[Sync] Firestore listener failed:', error.message);
+                },
+                teamId,
+                userRole
+            );
+        } catch (error) {
+            console.error('[Sync] Setup crash:', error);
+        }
+
+        return () => unsubscribeSync();
+    }, [isLoading, user, cloudProvider, firebaseConfig, teamId, userRole]);
 
     /**
      * EFFECT: System Maintenance
      * Runs periodic tasks like status updates and notification checks.
      */
     useEffect(() => {
-        updateAllEventStatuses(); // Initial calculation
-        initNotificationSystem(); // Setup reminders
+        try {
+            updateAllEventStatuses();
+            initNotificationSystem();
+        } catch (error) {
+            console.error('[System] Maintenance crash:', error);
+        }
 
-        // Every 6 hours, update statuses again (in case user left the app open)
-        const interval = setInterval(updateAllEventStatuses, 6 * 60 * 60 * 1000);
+        const interval = setInterval(() => {
+            try {
+                updateAllEventStatuses();
+            } catch (e) {
+                console.error('[System] Periodic update failed:', e);
+            }
+        }, 6 * 60 * 60 * 1000);
         return () => clearInterval(interval);
     }, []);
 
     return (
-        <>
+        <ErrorBoundary>
             {/* Splash Screen Overlay (High Z-Index) */}
             {showSplash && <SplashScreen onComplete={() => setShowSplash(false)} />}
 
-            {/* Main Application (Rendered beneath splash if ready, or hidden) */}
-            {!isLoading && user ? (
-                <Router>
-                    <div className="min-h-screen bg-gray-50 dark:bg-[#0f172a] transition-colors duration-500 pb-24 lg:pb-0">
-                        {/* Fixed Header */}
-                        <div className="sticky top-0 z-[60]">
-                            <Header />
+            {/* Main Application Logic */}
+            {!isLoading ? (
+                user ? (
+                    <Router>
+                        <div className="min-h-screen bg-gray-50 dark:bg-[#0f172a] transition-colors duration-500 pb-24 lg:pb-0">
+                            {/* Fixed Header */}
+                            <div className="sticky top-0 z-[60]">
+                                <Header />
+                            </div>
+
+                            {/* Mobile Bottom Navigation */}
+                            <BottomNav />
+
+                            {/* Shared Modals */}
+                            <Suspense fallback={null}>
+                                <AddEventModal />
+                                <ImportCSVModal />
+                                <EventDetailsModal />
+                                <EditEventModal />
+                                <PaymentModal />
+                                <TeamInviteModal />
+                                <FeedbackModal />
+                                <LegalModal />
+                            </Suspense>
+
+                            {/* Main Content Area */}
+                            <main className="container mx-auto px-3 sm:px-4 py-4 sm:py-6 max-w-7xl">
+                                <AnimatedRoutes />
+                            </main>
                         </div>
-
-                        {/* Mobile Bottom Navigation */}
-                        <BottomNav />
-
-                        {/* Shared Modals (Universal accessible from state) */}
-                        <Suspense fallback={null}>
-                            <AddEventModal />
-                            <ImportCSVModal />
-                            <EventDetailsModal />
-                            <EditEventModal />
-                        </Suspense>
-
-                        {/* Main Content Area */}
-                        <main className="container mx-auto px-3 sm:px-4 py-4 sm:py-6 max-w-7xl">
-                            <AnimatedRoutes />
-                        </main>
-                    </div>
-                </Router>
-            ) : (
-                // Show Login if not loading and no user
-                !isLoading && !user ? <Login /> : null
-            )}
-        </>
+                    </Router>
+                ) : (
+                    <Login />
+                )
+            ) : null}
+        </ErrorBoundary>
     );
 }
 

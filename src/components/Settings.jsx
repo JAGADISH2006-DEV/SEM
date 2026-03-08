@@ -3,7 +3,7 @@ import { useAppStore } from '../store';
 import { db, exportEventsToCSV } from '../db';
 import { exportToCSV, downloadCSV } from '../csvUtils';
 import { requestNotificationPermission } from '../notifications';
-import { bulkSyncToFirestore, getAllUsers, updateUserRole } from '../services/firebase';
+import { bulkSyncToFirestore, getAllUsers, updateUserRole, getPaymentRequests, approvePaymentRequest, rejectPaymentRequest } from '../services/firebase';
 import { Bell, Download, Trash2, Moon, Sun, Shield, Database, Smartphone, Cloud, Loader2, ArrowUpFromLine, Info, ChevronRight, LogOut, CheckCircle2, ShieldCheck, UserCog } from 'lucide-react';
 import { cn } from '../utils';
 
@@ -21,6 +21,8 @@ const Settings = () => {
     const [isSyncing, setIsSyncing] = React.useState(false);
     const [usersList, setUsersList] = React.useState([]);
     const [loadingUsers, setLoadingUsers] = React.useState(false);
+    const [paymentRequests, setPaymentRequests] = React.useState([]);
+    const [loadingPayments, setLoadingPayments] = React.useState(false);
 
     const userRole = useAppStore((state) => state.userRole);
 
@@ -30,6 +32,12 @@ const Settings = () => {
             getAllUsers().then(users => {
                 setUsersList(users);
                 setLoadingUsers(false);
+            });
+
+            setLoadingPayments(true);
+            getPaymentRequests().then(requests => {
+                setPaymentRequests(requests);
+                setLoadingPayments(false);
             });
         }
     }, [userRole]);
@@ -41,6 +49,32 @@ const Settings = () => {
             alert(`User role updated to ${newRole}`);
         } catch (error) {
             alert('Failed to update role: ' + error.message);
+        }
+    };
+
+    const handleApprovePayment = async (request) => {
+        if (!confirm(`Approve payment of ₹${request.amount} for ${request.userEmail}?`)) return;
+
+        try {
+            const planRole = request.planId === 'team' ? 'team_leader' : 'member';
+            await approvePaymentRequest(request.id, request.userId, planRole);
+            setPaymentRequests(prev => prev.map(r => r.id === request.id ? { ...r, status: 'approved' } : r));
+            alert('Payment approved and user role upgraded!');
+        } catch (error) {
+            alert('Approval failed: ' + error.message);
+        }
+    };
+
+    const handleRejectPayment = async (requestId) => {
+        const reason = prompt('Reason for rejection:');
+        if (reason === null) return;
+
+        try {
+            await rejectPaymentRequest(requestId, reason);
+            setPaymentRequests(prev => prev.map(r => r.id === requestId ? { ...r, status: 'rejected' } : r));
+            alert('Payment rejected.');
+        } catch (error) {
+            alert('Rejection failed: ' + error.message);
         }
     };
 
@@ -228,6 +262,69 @@ const Settings = () => {
             </SettingSection>
 
             {userRole === 'admin' && (
+                <SettingSection title="Payment Verification" description="Approve or reject plan upgrade requests" icon={ShieldCheck}>
+                    <div className="space-y-4">
+                        {loadingPayments ? (
+                            <div className="flex justify-center p-4">
+                                <Loader2 className="animate-spin text-indigo-600" />
+                            </div>
+                        ) : paymentRequests.length === 0 ? (
+                            <p className="text-center py-8 text-xs font-bold text-slate-400 uppercase tracking-widest">No payment requests found</p>
+                        ) : (
+                            <div className="space-y-3">
+                                {paymentRequests.map((req) => (
+                                    <div key={req.id} className="p-4 bg-slate-50 dark:bg-slate-900/50 rounded-xl border border-slate-100 dark:border-slate-800 space-y-4">
+                                        <div className="flex items-start justify-between">
+                                            <div>
+                                                <div className="flex items-center gap-2 mb-1">
+                                                    <span className="text-[10px] font-black uppercase tracking-widest px-2 py-0.5 bg-indigo-100 dark:bg-indigo-900/40 text-indigo-600 rounded-md">
+                                                        {req.planName}
+                                                    </span>
+                                                    <span className={cn(
+                                                        "text-[10px] font-black uppercase tracking-widest px-2 py-0.5 rounded-md",
+                                                        req.status === 'pending' ? "bg-amber-100 text-amber-600" :
+                                                            req.status === 'approved' ? "bg-emerald-100 text-emerald-600" :
+                                                                "bg-rose-100 text-rose-600"
+                                                    )}>
+                                                        {req.status}
+                                                    </span>
+                                                </div>
+                                                <p className="text-xs font-black text-slate-900 dark:text-white">{req.userEmail}</p>
+                                                <p className="text-[10px] text-slate-500 font-mono mt-0.5">UTR: {req.transactionId || 'Not provided'}</p>
+                                            </div>
+                                            <div className="text-right">
+                                                <p className="text-sm font-black text-indigo-600">₹{req.amount}</p>
+                                                <p className="text-[9px] text-slate-400 font-bold uppercase mt-1">
+                                                    {new Date(req.createdAt).toLocaleDateString()}
+                                                </p>
+                                            </div>
+                                        </div>
+
+                                        {req.status === 'pending' && (
+                                            <div className="flex gap-2">
+                                                <button
+                                                    onClick={() => handleApprovePayment(req)}
+                                                    className="flex-1 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-[10px] font-black uppercase tracking-widest transition-all shadow-lg shadow-emerald-500/20"
+                                                >
+                                                    Approve
+                                                </button>
+                                                <button
+                                                    onClick={() => handleRejectPayment(req.id)}
+                                                    className="flex-1 py-2 bg-rose-50 hover:bg-rose-100 text-rose-600 rounded-lg text-[10px] font-black uppercase tracking-widest border border-rose-100 transition-all"
+                                                >
+                                                    Reject
+                                                </button>
+                                            </div>
+                                        )}
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                    </div>
+                </SettingSection>
+            )}
+
+            {userRole === 'admin' && (
                 <SettingSection title="User Management" description="Manage team roles and access" icon={UserCog}>
                     <div className="space-y-4">
                         {loadingUsers ? (
@@ -268,6 +365,37 @@ const Settings = () => {
                                     Admins have full modification access. Managers can edit/delete events but cannot clear database. Members have read-only access.
                                 </p>
                             </div>
+                        </div>
+                    </div>
+                </SettingSection>
+            )}
+
+            {userRole === 'team_leader' && (
+                <SettingSection title="Team Management" description="Invite members to your team workspace" icon={UserCog}>
+                    <div className="space-y-4">
+                        <div className="p-6 bg-indigo-50 dark:bg-indigo-900/30 rounded-2xl border border-indigo-100 dark:border-indigo-800/50 shadow-inner">
+                            <h4 className="text-xs font-black uppercase tracking-widest text-indigo-900 dark:text-indigo-100 mb-3 flex items-center gap-2">
+                                <ShieldCheck size={16} /> Team Invite Link
+                            </h4>
+                            <div className="flex flex-col sm:flex-row items-center gap-3">
+                                <input
+                                    readOnly
+                                    value={`${window.location.origin}/invite/${user?.uid}`}
+                                    className="w-full bg-white dark:bg-slate-900 border border-indigo-200 dark:border-indigo-700/50 rounded-xl px-4 py-3 text-xs font-mono text-slate-600 dark:text-slate-300 outline-none select-all"
+                                />
+                                <button
+                                    onClick={() => {
+                                        navigator.clipboard.writeText(`${window.location.origin}/invite/${user?.uid}`);
+                                        alert("Invite link copied to clipboard!");
+                                    }}
+                                    className="w-full sm:w-auto px-6 py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-[10px] font-black uppercase tracking-widest shadow-lg shadow-indigo-500/30 transition-all shrink-0"
+                                >
+                                    Copy Link
+                                </button>
+                            </div>
+                            <p className="text-[10px] text-indigo-600/70 dark:text-indigo-400/80 mt-4 font-bold uppercase tracking-wider">
+                                Share this link to allow users to join your Team Edition workspace (Max 10).
+                            </p>
                         </div>
                     </div>
                 </SettingSection>

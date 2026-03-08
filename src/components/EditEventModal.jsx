@@ -77,6 +77,7 @@ const EditEventModal = () => {
         posterUrl: '',
         posterBlob: null,
         website: '',
+        registrationLink: '',
         description: '',
         teamSize: '1',
         eligibility: '',
@@ -85,7 +86,6 @@ const EditEventModal = () => {
         contact2: '',
         leader: '',
         members: '',
-        noOfTeams: '',
         noOfTeams: '',
         prizeWon: '',
         teamName: ''
@@ -112,6 +112,7 @@ const EditEventModal = () => {
                 posterUrl: event.posterUrl || '',
                 posterBlob: event.posterBlob || null,
                 website: event.website || '',
+                registrationLink: event.registrationLink || '',
                 description: event.description || '',
                 teamSize: event.teamSize || '1',
                 eligibility: event.eligibility || '',
@@ -441,10 +442,17 @@ const EditEventModal = () => {
                                     </div>
                                     <div className="space-y-6">
                                         <div className="form-group">
-                                            <label className="label-premium">Neural Link (Website)</label>
+                                            <label className="label-premium">Website Link</label>
                                             <div className="relative">
                                                 <LinkIcon className="absolute left-4 top-1/2 -translate-y-1/2 text-indigo-500" size={18} />
-                                                <input type="url" name="website" value={formData.website} onChange={handleChange} className="input-premium pl-12" placeholder="https://event.com/register" />
+                                                <input type="url" name="website" value={formData.website} onChange={handleChange} className="input-premium pl-12" placeholder="Official Website URL" />
+                                            </div>
+                                        </div>
+                                        <div className="form-group">
+                                            <label className="label-premium">Registration Link</label>
+                                            <div className="relative">
+                                                <LinkIcon className="absolute left-4 top-1/2 -translate-y-1/2 text-rose-500" size={18} />
+                                                <input type="url" name="registrationLink" value={formData.registrationLink} onChange={handleChange} className="input-premium pl-12" placeholder="Google Form / Registration Link" />
                                             </div>
                                         </div>
                                         <div className="p-6 bg-indigo-50 dark:bg-indigo-900/20 rounded-[2rem] border-2 border-dashed border-indigo-200 dark:border-indigo-800">

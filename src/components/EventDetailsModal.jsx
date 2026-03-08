@@ -168,7 +168,13 @@ const EventDetailsModal = () => {
 
                     <div className="absolute top-2 right-2 flex items-center gap-1.5">
                         <button
-                            onClick={async () => await updateEvent(event.id, { isShortlisted: !event.isShortlisted })}
+                            onClick={async () => {
+                                if (userRole === 'public') {
+                                    openModal('payment');
+                                } else {
+                                    await updateEvent(event.id, { isShortlisted: !event.isShortlisted });
+                                }
+                            }}
                             className={cn(
                                 "w-7 h-7 sm:w-8 sm:h-8 rounded-full flex items-center justify-center transition-all border",
                                 event.isShortlisted ? "bg-rose-500 border-rose-400 text-white" : "bg-white/10 border-white/10 text-white/60 hover:bg-white/20"
@@ -332,7 +338,20 @@ const EventDetailsModal = () => {
                                 className="mt-2 w-full h-10 sm:h-11 bg-indigo-600 text-white rounded-lg flex items-center justify-center gap-2 group hover:brightness-110 transition-all font-black text-[9px] uppercase tracking-widest"
                             >
                                 <Globe size={14} />
-                                Project Website
+                                Official Website
+                                <ExternalLink size={12} />
+                            </a>
+                        )}
+
+                        {event.registrationLink && (
+                            <a
+                                href={event.registrationLink}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="mt-2 w-full h-10 sm:h-11 bg-rose-600 text-white rounded-lg flex items-center justify-center gap-2 group hover:brightness-110 transition-all font-black text-[9px] uppercase tracking-widest shadow-lg shadow-rose-500/20"
+                            >
+                                <ExternalLink size={14} />
+                                Registration Form
                                 <ExternalLink size={12} />
                             </a>
                         )}
@@ -340,7 +359,7 @@ const EventDetailsModal = () => {
                 </div>
 
                 {/* Footer Section */}
-                <div className="px-3 py-2.5 sm:px-4 sm:py-3 bg-white dark:bg-slate-900 border-t border-slate-100 dark:border-slate-800 flex items-center gap-2 shrink-0">
+                < div className="px-3 py-2.5 sm:px-4 sm:py-3 bg-white dark:bg-slate-900 border-t border-slate-100 dark:border-slate-800 flex items-center gap-2 shrink-0" >
                     {canManage && (
                         <button
                             onClick={handleDelete}
@@ -368,11 +387,11 @@ const EventDetailsModal = () => {
                             Dismiss
                         </button>
                     </div>
-                </div>
-            </motion.div>
+                </div >
+            </motion.div >
 
             {/* FULL SCREEN IMAGE ZOOM MODAL */}
-            <AnimatePresence>
+            < AnimatePresence >
                 {isZoomed && (
                     <motion.div
                         initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
@@ -389,8 +408,8 @@ const EventDetailsModal = () => {
                         </button>
                     </motion.div>
                 )}
-            </AnimatePresence>
-        </div>,
+            </AnimatePresence >
+        </div >,
         document.body
     );
 };

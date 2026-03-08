@@ -60,6 +60,7 @@ const AddEventModal = () => {
         posterUrl: '',
         posterBlob: null,
         website: '',
+        registrationLink: '',
         description: '',
         teamSize: '1',
         teamName: '',
@@ -136,16 +137,19 @@ const AddEventModal = () => {
         e.preventDefault();
         setIsSubmitting(true);
         try {
+            const { teamId, user } = useAppStore.getState();
             const eventData = {
                 ...formData,
                 prizeAmount: parseFloat(formData.prizeAmount) || 0,
                 registrationFee: parseFloat(formData.registrationFee) || 0,
                 teamSize: parseInt(formData.teamSize) || 1,
-                contactNumbers: formData.contactNumbers.split(',').map(c => c.trim()).filter(Boolean)
+                contactNumbers: formData.contactNumbers.split(',').map(c => c.trim()).filter(Boolean),
+                teamId: teamId || null,
+                createdBy: user?.uid || 'unknown'
             };
             await addEvent(eventData);
             closeModal('addEvent');
-            setFormData({ collegeName: '', eventName: '', eventType: EventType.HACKATHON, registrationDeadline: '', startDate: '', endDate: '', prizeAmount: '', registrationFee: '', accommodation: false, location: '', isOnline: false, contactNumbers: '', posterUrl: '', posterBlob: null, website: '', description: '', teamSize: '1', teamName: '', eligibility: '', leader: '', members: '', contact1: '', contact2: '' });
+            setFormData({ collegeName: '', eventName: '', eventType: EventType.HACKATHON, registrationDeadline: '', startDate: '', endDate: '', prizeAmount: '', registrationFee: '', accommodation: false, location: '', isOnline: false, contactNumbers: '', posterUrl: '', posterBlob: null, website: '', registrationLink: '', description: '', teamSize: '1', teamName: '', eligibility: '', leader: '', members: '', contact1: '', contact2: '' });
         } catch (error) {
             alert(`CRITICAL ERROR: ${error.message}`);
         } finally {
@@ -294,11 +298,18 @@ const AddEventModal = () => {
                                         </label>
                                     </div>
                                 </div>
-                                <div className="form-group col-span-1 md:col-span-2">
-                                    <label className="label-premium">Registration Link</label>
+                                <div className="form-group">
+                                    <label className="label-premium">Website Link</label>
                                     <div className="relative">
                                         <Globe className="absolute left-6 top-1/2 -translate-y-1/2 text-indigo-500" size={20} />
                                         <input type="url" name="website" value={formData.website} onChange={handleChange} className="input-premium pl-16 text-indigo-600 font-black" placeholder="Official Website URL" />
+                                    </div>
+                                </div>
+                                <div className="form-group">
+                                    <label className="label-premium">Registration Link</label>
+                                    <div className="relative">
+                                        <Globe className="absolute left-6 top-1/2 -translate-y-1/2 text-rose-500" size={20} />
+                                        <input type="url" name="registrationLink" value={formData.registrationLink} onChange={handleChange} className="input-premium pl-16 text-rose-600 font-black" placeholder="Google Form / Registration URL" />
                                     </div>
                                 </div>
                             </div>

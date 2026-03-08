@@ -19,7 +19,8 @@ import {
     query,
     orderBy,
     deleteDoc,
-    getDoc
+    getDoc,
+    where
 } from "firebase/firestore";
 import {
     getAuth,
@@ -31,9 +32,9 @@ import {
 } from "firebase/auth";
 
 // These variables will hold our active instances once initialized
-let db = null;   // Firestore instance
-let auth = null; // Auth instance
-let app = null;  // Firebase App instance
+export let db = null;   // Firestore instance
+export let auth = null; // Auth instance
+export let app = null;  // Firebase App instance
 
 /**
  * Initializes Firebase with user-provided configuration.
@@ -69,19 +70,24 @@ export const loginUser = async (email, password) => {
 /**
  * AUTH: Creates a new team account and sets their display name.
  */
-export const registerUser = async (email, password, displayName) => {
+export const registerUser = async (email, password, displayName, extras = {}) => {
     if (!auth) throw new Error("Firebase Auth not initialized. Check your config in Settings.");
     const userCredential = await createUserWithEmailAndPassword(auth, email, password);
     if (displayName) {
         await updateProfile(userCredential.user, { displayName });
     }
 
-    // Create user document with default role
+    // Create user document with default role "public"
     if (db) {
         await setDoc(doc(db, "users", userCredential.user.uid), {
             email: email,
             displayName: displayName,
-            role: "member", // Default role
+            role: "public", // Default role is now public
+            mobile: extras.mobile || '',
+            college: extras.college || '',
+            department: extras.department || '',
+            year: extras.year || '',
+            section: extras.section || '',
             createdAt: new Date().toISOString()
         });
     }
@@ -98,19 +104,23 @@ export const logoutUser = async () => {
 };
 
 /**
- * FIRESTORE: Get user role
+ * FIRESTORE: Get user data (role and teamId)
  */
-export const getUserRole = async (uid) => {
-    if (!db) return null;
+export const getUserData = async (uid) => {
+    if (!db) return { role: 'public', teamId: null };
     try {
         const userDoc = await getDoc(doc(db, "users", uid));
         if (userDoc.exists()) {
-            return userDoc.data().role;
+            const data = userDoc.data();
+            return {
+                role: data.role || "public",
+                teamId: data.teamId || null
+            };
         }
-        return "member"; // Default fallback
+        return { role: "public", teamId: null };
     } catch (error) {
-        console.error("Error fetching user role:", error);
-        return "member";
+        console.error("Error fetching user data:", error);
+        return { role: "public", teamId: null };
     }
 };
 
@@ -134,13 +144,56 @@ export const updateUserRole = async (uid, role) => {
 };
 
 /**
+ * FIRESTORE: Create a manual payment request for admin verification.
+ */
+export const createPaymentRequest = async (requestData) => {
+    if (!db) {
+        console.error("Firestore not initialized when calling createPaymentRequest");
+        throw new Error("Firestore is not initialized. Please check your Firebase configuration in Settings.");
+    }
+
+    // Fallback for environment where crypto.randomUUID might not be available
+    const requestId = (typeof crypto !== 'undefined' && crypto.randomUUID)
+        ? crypto.randomUUID()
+        : Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+
+    const requestRef = doc(db, "payment_requests", requestId);
+
+    try {
+        await setDoc(requestRef, {
+            ...requestData,
+            requestId,
+            status: 'pending',
+            createdAt: new Date().toISOString()
+        });
+        return requestId;
+    } catch (error) {
+        console.error("Firestore Error in createPaymentRequest:", error);
+        throw error; // Re-throw to be caught by the UI
+    }
+};
+
+/**
  * FIRESTORE: Sets up a real-time listener for event changes.
  * Whenever anyone updates an event, this function calls the callback with the new data.
+ * @param {string} teamId - Filter events by teamId for multi-user isolation.
+ * @param {string} userRole - If admin, can see all events.
  */
-export const subscribeToEvents = (callback, onError) => {
+export const subscribeToEvents = (callback, onError, teamId = null, userRole = null) => {
     if (!db) return null;
     const eventsRef = collection(db, "events");
-    const q = query(eventsRef, orderBy("createdAt", "desc"));
+
+    let q;
+    if (userRole === 'admin') {
+        // Admins see everything
+        q = query(eventsRef, orderBy("createdAt", "desc"));
+    } else if (teamId) {
+        // Team members see their team events
+        q = query(eventsRef, where("teamId", "==", teamId), orderBy("createdAt", "desc"));
+    } else {
+        // Public users or users without a team only see public events (where teamId is null)
+        q = query(eventsRef, where("teamId", "==", null), orderBy("createdAt", "desc"));
+    }
 
     // onSnapshot is the "Magic" — it listens for real-time updates!
     return onSnapshot(q, (snapshot) => {
@@ -177,7 +230,11 @@ export const saveEventToFirestore = async (event) => {
     const eventRef = doc(db, "events", event.serverId);
 
     // Prepare data for cloud storage
-    const cleanEvent = { ...event };
+    const cleanEvent = {
+        ...event,
+        teamId: event.teamId || null,
+        createdBy: event.createdBy || auth?.currentUser?.uid || 'unknown'
+    };
     delete cleanEvent.posterBlob;
     delete cleanEvent.id; // NEVER save the local ID to the cloud
 
@@ -224,4 +281,55 @@ export const bulkSyncToFirestore = async (events) => {
     });
 
     await batch.commit(); // Execute all operations at once
+};
+/**
+ * FIRESTORE: Fetches all payment requests (Admin only)
+ */
+export const getPaymentRequests = async () => {
+    if (!db) return [];
+    try {
+        const querySnapshot = await getDocs(
+            query(collection(db, "payment_requests"), orderBy("createdAt", "desc"))
+        );
+        return querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    } catch (error) {
+        console.error("Error fetching payment requests:", error);
+        return [];
+    }
+};
+
+/**
+ * FIRESTORE: Approves a payment request and upgrades user role.
+ */
+export const approvePaymentRequest = async (requestId, userId, planRole) => {
+    if (!db) throw new Error("Firestore not initialized");
+
+    const batch = writeBatch(db);
+
+    // 1. Update request status
+    const requestRef = doc(db, "payment_requests", requestId);
+    batch.update(requestRef, {
+        status: 'approved',
+        approvedAt: new Date().toISOString()
+    });
+
+    // 2. Update user role
+    const userRef = doc(db, "users", userId);
+    batch.update(userRef, { role: planRole });
+
+    await batch.commit();
+};
+
+/**
+ * FIRESTORE: Rejects a payment request.
+ */
+export const rejectPaymentRequest = async (requestId, reason = '') => {
+    if (!db) throw new Error("Firestore not initialized");
+
+    const requestRef = doc(db, "payment_requests", requestId);
+    await setDoc(requestRef, {
+        status: 'rejected',
+        rejectionReason: reason,
+        rejectedAt: new Date().toISOString()
+    }, { merge: true });
 };

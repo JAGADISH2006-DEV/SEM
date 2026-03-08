@@ -29,6 +29,17 @@ const safeDiff = (date) => {
     }
 };
 
+const getDefaultPoster = (eventType, seed = '') => {
+    const type = (eventType || '').toLowerCase();
+    const idHash = (seed || '').split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
+    const variant = (idHash % 2) === 0 ? '' : '_alt1';
+
+    if (type.includes('hackathon') || type.includes('coding')) return `/posters/hackathon${variant}.png`;
+    if (type.includes('workshop') || type.includes('seminar') || type.includes('guest lecture')) return `/posters/workshop${variant}.png`;
+    if (type.includes('contest') || type.includes('competition') || type.includes('expo') || type.includes('presentation')) return `/posters/contest${variant}.png`;
+    return `/posters/generic${variant}.png`; // Fallback for 'Other', 'Conference', etc.
+};
+
 const PosterImage = ({ event }) => {
     const [imgSrc, setImgSrc] = React.useState(null);
 
@@ -43,7 +54,8 @@ const PosterImage = ({ event }) => {
         } else if (event.posterUrl) {
             setImgSrc(resolveImageUrl(event.posterUrl));
         } else {
-            setImgSrc(null);
+            // Use category-specific default placeholder
+            setImgSrc(getDefaultPoster(event.eventType, event.id));
         }
 
         return () => {
@@ -51,9 +63,10 @@ const PosterImage = ({ event }) => {
                 URL.revokeObjectURL(objectUrl);
             }
         };
-    }, [event.posterBlob, event.posterUrl]);
+    }, [event.posterBlob, event.posterUrl, event.eventType, event.id]);
 
     if (!imgSrc) {
+        // Fallback for when even the default poster fails to load somehow
         return (
             <div className="w-full h-full bg-gradient-to-br from-indigo-500 via-indigo-600 to-violet-800 flex flex-col items-center justify-center p-4">
                 <Zap size={24} className="text-white/40 mb-2 animate-pulse" />
@@ -67,7 +80,14 @@ const PosterImage = ({ event }) => {
             src={imgSrc}
             alt={event.eventName}
             className="w-full h-full object-cover transition-transform duration-700 ease-out group-hover:scale-105"
-            onError={() => setImgSrc(null)}
+            onError={() => {
+                // Prevent infinite loop if default poster is also missing
+                if (imgSrc !== getDefaultPoster(event.eventType, event.id)) {
+                    setImgSrc(getDefaultPoster(event.eventType, event.id));
+                } else {
+                    setImgSrc(null);
+                }
+            }}
         />
     );
 };
@@ -108,6 +128,7 @@ const EventCard = React.memo(({ event, compact = false }) => {
             'Won': { icon: Trophy, color: 'text-amber-600', bg: 'bg-amber-50 dark:bg-amber-500/10', border: 'border-amber-100 dark:border-amber-500/20', dot: 'bg-amber-500' },
             'Blocked': { icon: ShieldCheck, color: 'text-rose-600', bg: 'bg-rose-50 dark:bg-rose-500/10', border: 'border-rose-100 dark:border-rose-500/20', dot: 'bg-rose-500' },
             'Closed': { icon: Clock, color: 'text-slate-500', bg: 'bg-slate-50 dark:bg-slate-500/10', border: 'border-slate-200 dark:border-slate-500/20', dot: 'bg-slate-400' },
+            'Completed': { icon: Clock, color: 'text-slate-500', bg: 'bg-slate-50 dark:bg-slate-500/10', border: 'border-slate-200 dark:border-slate-500/20', dot: 'bg-slate-400' },
             'Attended': { icon: Users, color: 'text-indigo-600', bg: 'bg-indigo-50 dark:bg-indigo-500/10', border: 'border-indigo-100 dark:border-indigo-500/20', dot: 'bg-indigo-500' },
             'Registered': { icon: ShieldCheck, color: 'text-emerald-600', bg: 'bg-emerald-50 dark:bg-emerald-500/10', border: 'border-emerald-100 dark:border-emerald-500/20', dot: 'bg-emerald-500' },
             'Deadline Today': { icon: Clock, color: 'text-rose-600', bg: 'bg-rose-50 dark:bg-rose-500/10', border: 'border-rose-100 dark:border-rose-500/20', dot: 'bg-rose-500 animate-pulse' }
@@ -174,7 +195,17 @@ const EventCard = React.memo(({ event, compact = false }) => {
                         <button onClick={(e) => { e.stopPropagation(); togglePinnedEvent(event.id); }} className={cn("p-1.5 rounded-lg transition-colors", isPinned ? "text-indigo-600 bg-indigo-50" : "text-slate-400 hover:bg-slate-100")}>
                             <Pin size={14} fill={isPinned ? "currentColor" : "none"} />
                         </button>
-                        <button onClick={(e) => { e.stopPropagation(); updateEvent(event.id, { isShortlisted: !event.isShortlisted }); }} className={cn("p-1.5 rounded-lg transition-colors", event.isShortlisted ? "text-rose-500 bg-rose-50" : "text-slate-400 hover:bg-slate-100")}>
+                        <button
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                if (userRole === 'public') {
+                                    openModal('payment');
+                                } else {
+                                    updateEvent(event.id, { isShortlisted: !event.isShortlisted });
+                                }
+                            }}
+                            className={cn("p-1.5 rounded-lg transition-colors", event.isShortlisted ? "text-rose-500 bg-rose-50" : "text-slate-400 hover:bg-slate-100")}
+                        >
                             <Heart size={14} fill={event.isShortlisted ? "currentColor" : "none"} />
                         </button>
                         {canEdit && (
@@ -195,9 +226,21 @@ const EventCard = React.memo(({ event, compact = false }) => {
                     <h3 className="text-base sm:text-lg font-black text-slate-900 dark:text-white line-clamp-1 group-hover:text-indigo-600 transition-colors leading-tight">
                         {event.eventName}
                     </h3>
-                    <div className="flex items-center gap-1.5 mt-1 text-slate-500 dark:text-slate-400">
-                        <Globe size={12} />
-                        <span className="text-xs font-bold uppercase tracking-wide truncate">{event.collegeName}</span>
+                    <div className="flex flex-wrap items-center gap-3 mt-2 no-click">
+                        <div className="flex items-center gap-1.5 text-slate-500 dark:text-slate-400">
+                            <Globe size={12} />
+                            <span className="text-xs font-bold uppercase tracking-wide truncate max-w-[150px]">{event.collegeName}</span>
+                        </div>
+                        {event.website && (
+                            <a href={event.website} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 px-2 py-0.5 bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 text-[9px] font-black uppercase tracking-widest rounded border border-indigo-100 dark:border-indigo-800 hover:bg-indigo-600 hover:text-white transition-all">
+                                <Globe size={10} /> Website
+                            </a>
+                        )}
+                        {event.registrationLink && (
+                            <a href={event.registrationLink} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 px-2 py-0.5 bg-rose-50 dark:bg-rose-900/30 text-rose-600 dark:text-rose-400 text-[9px] font-black uppercase tracking-widest rounded border border-rose-100 dark:border-rose-800 hover:bg-rose-600 hover:text-white transition-all shadow-sm shadow-rose-500/10">
+                                <ExternalLink size={10} /> Register
+                            </a>
+                        )}
                     </div>
                 </div>
 
@@ -327,6 +370,33 @@ const EventCard = React.memo(({ event, compact = false }) => {
                     Full details should be in the modal. Match the design:
                     The design shows compact info.
                 */}
+
+                {/* Register Action */}
+                <div className="mt-4 pt-4 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between no-click" onClick={(e) => e.stopPropagation()}>
+                    <div className="flex gap-2">
+                        {event.website && (
+                            <a
+                                href={event.website}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="inline-flex items-center gap-2 px-3 py-1.5 bg-slate-50 dark:bg-slate-800 text-slate-500 dark:text-slate-400 text-[10px] font-black uppercase tracking-widest rounded-lg hover:bg-indigo-50 hover:text-indigo-600 transition-all"
+                            >
+                                <Globe size={12} />
+                            </a>
+                        )}
+                    </div>
+                    <a
+                        href={event.registrationLink || event.website}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className={cn(
+                            "inline-flex items-center gap-2 px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all shadow-lg hover:scale-105 active:scale-95",
+                            event.registrationLink ? "bg-indigo-600 text-white shadow-indigo-500/20 hover:bg-indigo-700" : "bg-slate-900 text-white shadow-slate-900/20 hover:bg-slate-800"
+                        )}
+                    >
+                        <ExternalLink size={14} /> {event.registrationLink ? 'Register Now' : 'Visit Website'}
+                    </a>
+                </div>
             </div>
         </motion.div>
     );

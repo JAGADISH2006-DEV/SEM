@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { db, EventType, EventStatus, exportEventsToCSV } from '../db';
 import { useAppStore } from '../store';
 import EventCard from './EventCard';
-import { Search, Filter, SortDesc, SlidersHorizontal, ArrowUpDown, Table as TableIcon, LayoutGrid, FileSpreadsheet, ChevronRight, MapPin, Calendar, Clock, Trophy, Zap, ArrowUp, Heart, Terminal, Cpu, Database, Binary } from 'lucide-react';
+import { Search, Filter, SortDesc, SlidersHorizontal, ArrowUpDown, Table as TableIcon, LayoutGrid, FileSpreadsheet, ChevronRight, MapPin, Calendar, Clock, Trophy, Zap, ArrowUp, Heart, Terminal, Cpu, Database, Binary, Shield } from 'lucide-react';
 import { cn } from '../utils';
 import { format, isSameDay } from 'date-fns';
 import { exportToCSV, downloadCSV } from '../csvUtils';
@@ -41,6 +41,7 @@ const TableView = React.memo(({ events }) => {
                             <th className="px-8 py-6 text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">Deadline</th>
                             <th className="px-8 py-6 text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 text-center">Priority</th>
                             <th className="px-8 py-6 text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">Prize</th>
+                            <th className="px-8 py-6 text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">Links</th>
                             <th className="px-8 py-6 text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 text-right">Action</th>
                         </tr>
                     </thead>
@@ -85,6 +86,20 @@ const TableView = React.memo(({ events }) => {
                                 <td className="px-8 py-6 font-black text-emerald-600 dark:text-emerald-400 text-base tabular-nums">
                                     {event.prizeAmount > 0 ? `₹${event.prizeAmount.toLocaleString()}` : '---'}
                                 </td>
+                                <td className="px-8 py-6">
+                                    <div className="flex gap-2 no-click" onClick={(e) => e.stopPropagation()}>
+                                        {event.registrationLink && (
+                                            <a href={event.registrationLink} target="_blank" rel="noopener noreferrer" className="w-8 h-8 flex items-center justify-center bg-indigo-50 text-indigo-600 rounded-lg hover:bg-indigo-600 hover:text-white transition-all shadow-sm" title="Registration Form">
+                                                <ExternalLink size={14} />
+                                            </a>
+                                        )}
+                                        {event.website && (
+                                            <a href={event.website} target="_blank" rel="noopener noreferrer" className="w-8 h-8 flex items-center justify-center bg-slate-50 text-slate-400 rounded-lg hover:bg-slate-200 hover:text-slate-600 transition-all shadow-sm" title="Official Website">
+                                                <Globe size={14} />
+                                            </a>
+                                        )}
+                                    </div>
+                                </td>
                                 <td className="px-8 py-6 text-right">
                                     <div className="inline-flex items-center justify-center w-10 h-10 rounded-xl bg-slate-50 dark:bg-slate-800 text-slate-300 group-hover:text-indigo-600 group-hover:bg-indigo-50 transition-all border border-transparent group-hover:border-indigo-100">
                                         <ChevronRight size={20} strokeWidth={3} />
@@ -107,6 +122,8 @@ const EventList = () => {
     const setSorting = useAppStore((state) => state.setSorting);
     const viewMode = useAppStore((state) => state.viewMode);
     const setViewMode = useAppStore((state) => state.setViewMode);
+    const userRole = useAppStore((state) => state.userRole);
+    const openPaymentModal = () => useAppStore.getState().openModal('payment');
 
     const [showScrollTop, setShowScrollTop] = useState(false);
 
@@ -250,171 +267,186 @@ const EventList = () => {
             </div>
 
             {/* Tactical Search & Filters */}
-            <div className="bg-white dark:bg-slate-900 rounded-[2.5rem] p-8 mb-12 border border-slate-100 dark:border-slate-800 shadow-[0_32px_64px_-12px_rgba(0,0,0,0.05)]">
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                    <div className="relative group lg:col-span-2">
-                        <div className="absolute inset-y-0 left-6 flex items-center text-slate-400 group-focus-within:text-indigo-600 transition-colors">
-                            <Terminal size={20} strokeWidth={3} />
+            <div className="relative bg-white dark:bg-slate-900 rounded-[2.5rem] p-8 mb-12 border border-slate-100 dark:border-slate-800 shadow-[0_32px_64px_-12px_rgba(0,0,0,0.05)] overflow-hidden">
+                {userRole === 'public' && (
+                    <div className="absolute inset-0 bg-white/70 dark:bg-slate-900/70 backdrop-blur-sm z-10 flex flex-col items-center justify-center p-6 text-center">
+                        <div className="w-16 h-16 bg-rose-50 dark:bg-rose-900/30 text-rose-500 rounded-full flex items-center justify-center mb-4">
+                            <Shield size={32} />
                         </div>
-                        <input
-                            type="text"
-                            placeholder="Search by Event Name, College, or Location..."
-                            value={filters.search}
-                            onChange={(e) => setFilters({ search: e.target.value })}
-                            className="w-full pl-16 pr-6 py-5 bg-slate-50 dark:bg-slate-800/50 border-2 border-transparent focus:border-indigo-600 focus:bg-white dark:focus:bg-slate-900 rounded-2xl outline-none font-black text-sm tracking-tight text-slate-900 dark:text-white transition-all shadow-inner"
-                        />
-                    </div>
-                    <div className="grid grid-cols-2 lg:grid-cols-3 gap-4 lg:col-span-2">
-                        <select
-                            value={filters.status}
-                            onChange={(e) => setFilters({ status: e.target.value })}
-                            className="bg-slate-50 dark:bg-slate-800/50 border-2 border-transparent focus:border-indigo-600 rounded-2xl px-6 py-5 outline-none font-black text-[10px] uppercase tracking-widest text-slate-500 appearance-none shadow-inner"
-                        >
-                            <option value="all">Every Status</option>
-                            {Object.values(EventStatus).map(s => <option key={s} value={s}>{s}</option>)}
-                        </select>
-                        <select
-                            value={filters.eventType}
-                            onChange={(e) => setFilters({ eventType: e.target.value })}
-                            className="bg-slate-50 dark:bg-slate-800/50 border-2 border-transparent focus:border-indigo-600 rounded-2xl px-6 py-5 outline-none font-black text-[10px] uppercase tracking-widest text-slate-500 appearance-none shadow-inner"
-                        >
-                            <option value="all">Every Category</option>
-                            {Object.values(EventType).map(t => <option key={t} value={t}>{t}</option>)}
-                        </select>
-                        <button
-                            onClick={() => setFilters({ showShortlisted: !filters.showShortlisted })}
-                            className={cn("flex items-center justify-center gap-3 rounded-2xl font-black text-[10px] uppercase tracking-widest transition-all border-2 h-full", filters.showShortlisted ? "bg-rose-600 text-white border-rose-600 shadow-xl shadow-rose-500/20" : "bg-white dark:bg-slate-900 border-slate-100 dark:border-slate-800 text-slate-400")}
-                        >
-                            <Heart size={14} fill={filters.showShortlisted ? "currentColor" : "none"} /> Shortlisted
+                        <h3 className="text-xl font-black tracking-tight text-slate-900 dark:text-white mb-2">Team Edition Required</h3>
+                        <p className="text-xs font-bold text-slate-500 mb-6 max-w-md">Advanced filtering, smart sorting, and priority scoring are reserved for Team Edition members. Upgrade to unlock.</p>
+                        <button onClick={openPaymentModal} className="px-6 py-3 bg-indigo-600 text-white rounded-xl text-[10px] font-black uppercase tracking-widest shadow-lg shadow-indigo-500/30 hover:bg-indigo-700 transition-all hover:scale-105 relative z-20 cursor-pointer">
+                            Upgrade to Team Edition
                         </button>
                     </div>
-                </div>
+                )}
 
-                <div className="mt-8 pt-8 border-t border-slate-50 dark:border-slate-800/50 flex flex-wrap items-center justify-between gap-6">
-                    <div className="flex flex-wrap items-center gap-6">
-                        <div className="flex items-center gap-4">
-                            <span className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">Sort By</span>
-                            <div className="flex p-1.5 bg-slate-50 dark:bg-slate-800/50 rounded-2xl border border-slate-100 dark:border-slate-800">
-                                {['priorityScore', 'deadline', 'prizeAmount'].map(f => (
-                                    <button
-                                        key={f}
-                                        onClick={() => setSorting(f, sortOrder)}
-                                        className={cn("px-5 py-2.5 text-[10px] font-black uppercase tracking-widest rounded-xl transition-all", sortBy === f ? "bg-white dark:bg-slate-700 text-indigo-600 shadow-sm" : "text-slate-400 hover:text-slate-600")}
-                                    >
-                                        {f.replace('priorityScore', 'Priority').replace('deadline', 'Deadline').replace('prizeAmount', 'Prize')}
-                                    </button>
-                                ))}
+                <div className={cn(userRole === 'public' && "opacity-30 blur-sm pointer-events-none")}>
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                        <div className="relative group lg:col-span-2">
+                            <div className="absolute inset-y-0 left-6 flex items-center text-slate-400 group-focus-within:text-indigo-600 transition-colors">
+                                <Terminal size={20} strokeWidth={3} />
                             </div>
-                            <button onClick={() => setSorting(sortBy, sortOrder === 'asc' ? 'desc' : 'asc')} className="w-12 h-12 flex items-center justify-center bg-slate-50 dark:bg-slate-800/50 rounded-2xl text-slate-500 hover:text-indigo-600 transition-colors border border-slate-100 dark:border-slate-800">
-                                <ArrowUpDown size={18} strokeWidth={3} />
-                            </button>
-                        </div>
-
-                        <div className="flex items-center gap-4">
-                            <span className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">Time Filter</span>
-                            <select
-                                value={filters.dateRange}
-                                onChange={(e) => setFilters({ dateRange: e.target.value })}
-                                className="bg-slate-50 dark:bg-slate-800/50 border-2 border-transparent focus:border-indigo-600 rounded-2xl px-6 py-3 outline-none font-black text-[10px] uppercase tracking-widest text-slate-500 appearance-none shadow-inner"
-                            >
-                                <option value="all">Any Time</option>
-                                <option value="today">Today</option>
-                                <option value="week">This Week</option>
-                                <option value="month">This Month</option>
-                                <option value="upcoming">Upcoming</option>
-                                <option value="completed">Past Events</option>
-                            </select>
-                        </div>
-                        <div className="flex items-center gap-4">
-                            <span className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">Prize Pool</span>
-                            <select
-                                value={filters.prizeRange}
-                                onChange={(e) => setFilters({ prizeRange: e.target.value })}
-                                className="bg-slate-50 dark:bg-slate-800/50 border-2 border-transparent focus:border-indigo-600 rounded-2xl px-6 py-3 outline-none font-black text-[10px] uppercase tracking-widest text-slate-500 appearance-none shadow-inner"
-                            >
-                                <option value="all">Any Prize</option>
-                                <option value="free">No Prize</option>
-                                <option value="small">{"< ₹10k"}</option>
-                                <option value="medium">₹10k - ₹50k</option>
-                                <option value="large">{"≥ ₹50k"}</option>
-                            </select>
-                        </div>
-                    </div>
-
-                    {/* Custom Date Range Row */}
-                    <div className="flex flex-wrap items-center gap-4 mt-4 pt-4 border-t border-slate-50 dark:border-slate-800/50">
-                        <span className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">Date Range</span>
-                        <div className="flex items-center gap-2">
-                            <label className="text-[9px] font-bold text-slate-400 uppercase">From</label>
                             <input
-                                type="date"
-                                value={filters.dateFrom || ''}
-                                onChange={(e) => setFilters({ dateFrom: e.target.value })}
-                                className="bg-slate-50 dark:bg-slate-800/50 border-2 border-transparent focus:border-indigo-600 rounded-xl px-4 py-2.5 outline-none font-bold text-xs text-slate-600 dark:text-slate-300 shadow-inner"
+                                type="text"
+                                placeholder="Search by Event Name, College, or Location..."
+                                value={filters.search}
+                                onChange={(e) => setFilters({ search: e.target.value })}
+                                className="w-full pl-16 pr-6 py-5 bg-slate-50 dark:bg-slate-800/50 border-2 border-transparent focus:border-indigo-600 focus:bg-white dark:focus:bg-slate-900 rounded-2xl outline-none font-black text-sm tracking-tight text-slate-900 dark:text-white transition-all shadow-inner"
                             />
                         </div>
-                        <div className="flex items-center gap-2">
-                            <label className="text-[9px] font-bold text-slate-400 uppercase">To</label>
-                            <input
-                                type="date"
-                                value={filters.dateTo || ''}
-                                onChange={(e) => setFilters({ dateTo: e.target.value })}
-                                className="bg-slate-50 dark:bg-slate-800/50 border-2 border-transparent focus:border-indigo-600 rounded-xl px-4 py-2.5 outline-none font-bold text-xs text-slate-600 dark:text-slate-300 shadow-inner"
-                            />
-                        </div>
-                        {(filters.dateFrom || filters.dateTo) && (
+                        <div className="grid grid-cols-2 lg:grid-cols-3 gap-4 lg:col-span-2">
+                            <select
+                                value={filters.status}
+                                onChange={(e) => setFilters({ status: e.target.value })}
+                                className="bg-slate-50 dark:bg-slate-800/50 border-2 border-transparent focus:border-indigo-600 rounded-2xl px-6 py-5 outline-none font-black text-[10px] uppercase tracking-widest text-slate-500 appearance-none shadow-inner"
+                            >
+                                <option value="all">Every Status</option>
+                                {Object.values(EventStatus).map(s => <option key={s} value={s}>{s}</option>)}
+                            </select>
+                            <select
+                                value={filters.eventType}
+                                onChange={(e) => setFilters({ eventType: e.target.value })}
+                                className="bg-slate-50 dark:bg-slate-800/50 border-2 border-transparent focus:border-indigo-600 rounded-2xl px-6 py-5 outline-none font-black text-[10px] uppercase tracking-widest text-slate-500 appearance-none shadow-inner"
+                            >
+                                <option value="all">Every Category</option>
+                                {Object.values(EventType).map(t => <option key={t} value={t}>{t}</option>)}
+                            </select>
                             <button
-                                onClick={() => setFilters({ dateFrom: '', dateTo: '' })}
-                                className="text-[9px] font-black uppercase tracking-widest text-rose-500 hover:text-rose-600 transition-colors"
+                                onClick={() => setFilters({ showShortlisted: !filters.showShortlisted })}
+                                className={cn("flex items-center justify-center gap-3 rounded-2xl font-black text-[10px] uppercase tracking-widest transition-all border-2 h-full", filters.showShortlisted ? "bg-rose-600 text-white border-rose-600 shadow-xl shadow-rose-500/20" : "bg-white dark:bg-slate-900 border-slate-100 dark:border-slate-800 text-slate-400")}
                             >
-                                Clear Dates
+                                <Heart size={14} fill={filters.showShortlisted ? "currentColor" : "none"} /> Shortlisted
                             </button>
-                        )}
+                        </div>
                     </div>
 
-                    <div className="flex justify-end mt-4">
-                        <button onClick={() => setFilters({ search: '', status: 'all', eventType: 'all', dateRange: 'all', prizeRange: 'all', showShortlisted: false, dateFrom: '', dateTo: '' })} className="text-[10px] font-black uppercase tracking-widest text-slate-300 hover:text-rose-500 transition-colors">Reset All Filters</button>
-                    </div>
-                </div>
-            </div>
-
-            <div className="flex items-center justify-between mb-8 px-2">
-                <div className="flex items-center gap-4">
-                    <div className="w-2 h-2 rounded-full bg-indigo-600 animate-pulse shadow-[0_0_8px_rgba(79,70,229,1)]" />
-                    <span className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">{filteredEvents.length} SIGNAL(S) IDENTIFIED</span>
-                </div>
-            </div>
-
-            <AnimatePresence mode="wait">
-                {filteredEvents.length > 0 ? (
-                    <motion.div key={viewMode} initial={{ opacity: 0, scale: 0.98 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 1.02 }} transition={{ duration: 0.2 }}>
-                        {viewMode === 'table' ? <TableView events={filteredEvents} /> : (
-                            <div className="grid grid-cols-1 xl:grid-cols-2 gap-8 auto-rows-fr">
-                                {filteredEvents.map((event, idx) => (
-                                    <motion.div key={event.id} initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: Math.min(idx * 0.05, 0.4) }} className="h-full">
-                                        <EventCard event={event} />
-                                    </motion.div>
-                                ))}
+                    <div className="mt-8 pt-8 border-t border-slate-50 dark:border-slate-800/50 flex flex-wrap items-center justify-between gap-6">
+                        <div className="flex flex-wrap items-center gap-6">
+                            <div className="flex items-center gap-4">
+                                <span className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">Sort By</span>
+                                <div className="flex p-1.5 bg-slate-50 dark:bg-slate-800/50 rounded-2xl border border-slate-100 dark:border-slate-800">
+                                    {['priorityScore', 'deadline', 'prizeAmount'].map(f => (
+                                        <button
+                                            key={f}
+                                            onClick={() => setSorting(f, sortOrder)}
+                                            className={cn("px-5 py-2.5 text-[10px] font-black uppercase tracking-widest rounded-xl transition-all", sortBy === f ? "bg-white dark:bg-slate-700 text-indigo-600 shadow-sm" : "text-slate-400 hover:text-slate-600")}
+                                        >
+                                            {f.replace('priorityScore', 'Priority').replace('deadline', 'Deadline').replace('prizeAmount', 'Prize')}
+                                        </button>
+                                    ))}
+                                </div>
+                                <button onClick={() => setSorting(sortBy, sortOrder === 'asc' ? 'desc' : 'asc')} className="w-12 h-12 flex items-center justify-center bg-slate-50 dark:bg-slate-800/50 rounded-2xl text-slate-500 hover:text-indigo-600 transition-colors border border-slate-100 dark:border-slate-800">
+                                    <ArrowUpDown size={18} strokeWidth={3} />
+                                </button>
                             </div>
-                        )}
-                    </motion.div>
-                ) : (
-                    <div className="py-40 text-center bg-slate-50/50 dark:bg-slate-900/50 rounded-[3rem] border-2 border-dashed border-slate-200 dark:border-slate-800">
-                        <Database size={64} className="mx-auto text-slate-200 mb-8" />
-                        <h3 className="text-2xl font-black text-slate-400 uppercase tracking-[0.2em]">Zero Grid Matches</h3>
-                        <p className="text-xs text-slate-400 font-bold mt-2">Adjust search parameters or initialize new node.</p>
-                    </div>
-                )}
-            </AnimatePresence>
 
-            {/* Float Scroll To Top */}
-            <AnimatePresence>
-                {showScrollTop && (
-                    <motion.button initial={{ scale: 0 }} animate={{ scale: 1 }} exit={{ scale: 0 }} onClick={scrollToTop} className="fixed bottom-32 right-8 w-16 h-16 bg-slate-900 text-white rounded-2xl shadow-2xl z-50 flex items-center justify-center hover:scale-110 active:scale-95 transition-all">
-                        <ArrowUp size={24} strokeWidth={3} />
-                    </motion.button>
-                )}
-            </AnimatePresence>
+                            <div className="flex items-center gap-4">
+                                <span className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">Time Filter</span>
+                                <select
+                                    value={filters.dateRange}
+                                    onChange={(e) => setFilters({ dateRange: e.target.value })}
+                                    className="bg-slate-50 dark:bg-slate-800/50 border-2 border-transparent focus:border-indigo-600 rounded-2xl px-6 py-3 outline-none font-black text-[10px] uppercase tracking-widest text-slate-500 appearance-none shadow-inner"
+                                >
+                                    <option value="all">Any Time</option>
+                                    <option value="today">Today</option>
+                                    <option value="week">This Week</option>
+                                    <option value="month">This Month</option>
+                                    <option value="upcoming">Upcoming</option>
+                                    <option value="completed">Past Events</option>
+                                </select>
+                            </div>
+                            <div className="flex items-center gap-4">
+                                <span className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">Prize Pool</span>
+                                <select
+                                    value={filters.prizeRange}
+                                    onChange={(e) => setFilters({ prizeRange: e.target.value })}
+                                    className="bg-slate-50 dark:bg-slate-800/50 border-2 border-transparent focus:border-indigo-600 rounded-2xl px-6 py-3 outline-none font-black text-[10px] uppercase tracking-widest text-slate-500 appearance-none shadow-inner"
+                                >
+                                    <option value="all">Any Prize</option>
+                                    <option value="free">No Prize</option>
+                                    <option value="small">{"< ₹10k"}</option>
+                                    <option value="medium">₹10k - ₹50k</option>
+                                    <option value="large">{"≥ ₹50k"}</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        {/* Custom Date Range Row */}
+                        <div className="flex flex-wrap items-center gap-4 mt-4 pt-4 border-t border-slate-50 dark:border-slate-800/50">
+                            <span className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">Date Range</span>
+                            <div className="flex items-center gap-2">
+                                <label className="text-[9px] font-bold text-slate-400 uppercase">From</label>
+                                <input
+                                    type="date"
+                                    value={filters.dateFrom || ''}
+                                    onChange={(e) => setFilters({ dateFrom: e.target.value })}
+                                    className="bg-slate-50 dark:bg-slate-800/50 border-2 border-transparent focus:border-indigo-600 rounded-xl px-4 py-2.5 outline-none font-bold text-xs text-slate-600 dark:text-slate-300 shadow-inner"
+                                />
+                            </div>
+                            <div className="flex items-center gap-2">
+                                <label className="text-[9px] font-bold text-slate-400 uppercase">To</label>
+                                <input
+                                    type="date"
+                                    value={filters.dateTo || ''}
+                                    onChange={(e) => setFilters({ dateTo: e.target.value })}
+                                    className="bg-slate-50 dark:bg-slate-800/50 border-2 border-transparent focus:border-indigo-600 rounded-xl px-4 py-2.5 outline-none font-bold text-xs text-slate-600 dark:text-slate-300 shadow-inner"
+                                />
+                            </div>
+                            {(filters.dateFrom || filters.dateTo) && (
+                                <button
+                                    onClick={() => setFilters({ dateFrom: '', dateTo: '' })}
+                                    className="text-[9px] font-black uppercase tracking-widest text-rose-500 hover:text-rose-600 transition-colors"
+                                >
+                                    Clear Dates
+                                </button>
+                            )}
+                        </div>
+
+                        <div className="flex justify-end mt-4">
+                            <button onClick={() => setFilters({ search: '', status: 'all', eventType: 'all', dateRange: 'all', prizeRange: 'all', showShortlisted: false, dateFrom: '', dateTo: '' })} className="text-[10px] font-black uppercase tracking-widest text-slate-300 hover:text-rose-500 transition-colors">Reset All Filters</button>
+                        </div>
+                    </div>
+                </div>
+
+                <div className="flex items-center justify-between mb-8 px-2">
+                    <div className="flex items-center gap-4">
+                        <div className="w-2 h-2 rounded-full bg-indigo-600 animate-pulse shadow-[0_0_8px_rgba(79,70,229,1)]" />
+                        <span className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">{filteredEvents.length} SIGNAL(S) IDENTIFIED</span>
+                    </div>
+                </div>
+
+                <AnimatePresence mode="wait">
+                    {filteredEvents.length > 0 ? (
+                        <motion.div key={viewMode} initial={{ opacity: 0, scale: 0.98 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 1.02 }} transition={{ duration: 0.2 }}>
+                            {viewMode === 'table' ? <TableView events={filteredEvents} /> : (
+                                <div className="grid grid-cols-1 xl:grid-cols-2 gap-8 auto-rows-fr">
+                                    {filteredEvents.map((event, idx) => (
+                                        <motion.div key={event.id} initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: Math.min(idx * 0.05, 0.4) }} className="h-full">
+                                            <EventCard event={event} />
+                                        </motion.div>
+                                    ))}
+                                </div>
+                            )}
+                        </motion.div>
+                    ) : (
+                        <div className="py-40 text-center bg-slate-50/50 dark:bg-slate-900/50 rounded-[3rem] border-2 border-dashed border-slate-200 dark:border-slate-800">
+                            <Database size={64} className="mx-auto text-slate-200 mb-8" />
+                            <h3 className="text-2xl font-black text-slate-400 uppercase tracking-[0.2em]">Zero Grid Matches</h3>
+                            <p className="text-xs text-slate-400 font-bold mt-2">Adjust search parameters or initialize new node.</p>
+                        </div>
+                    )}
+                </AnimatePresence>
+
+                {/* Float Scroll To Top */}
+                <AnimatePresence>
+                    {showScrollTop && (
+                        <motion.button initial={{ scale: 0 }} animate={{ scale: 1 }} exit={{ scale: 0 }} onClick={scrollToTop} className="fixed bottom-32 right-8 w-16 h-16 bg-slate-900 text-white rounded-2xl shadow-2xl z-50 flex items-center justify-center hover:scale-110 active:scale-95 transition-all">
+                            <ArrowUp size={24} strokeWidth={3} />
+                        </motion.button>
+                    )}
+                </AnimatePresence>
+            </div>
         </div>
     );
 };

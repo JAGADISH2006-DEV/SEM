@@ -291,6 +291,12 @@ const Discovery = () => {
                                                     <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-2">Deadline</span>
                                                     <span className="text-xs font-black text-rose-600">{event.registrationDeadline}</span>
                                                 </div>
+                                                <div>
+                                                    <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-1">Registration</span>
+                                                    <a href={event.registrationLink || event.website} target="_blank" rel="noopener noreferrer" className="text-xs font-black text-indigo-600 hover:underline">
+                                                        {event.registrationLink ? 'Form Link' : 'Via Website'}
+                                                    </a>
+                                                </div>
                                             </div>
                                         </div>
 

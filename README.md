@@ -1,4 +1,4 @@
-# 🎓 Event Manager
+# 🎓 SEM Student Event Manager
 
 > **Offline-first, intelligent event management system for engineering students**
 

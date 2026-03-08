@@ -60,6 +60,7 @@ export const useAppStore = create(
             // Stores the current Firebase User object
             user: JSON.parse(localStorage.getItem('reddot_user') || 'null'),
             userRole: localStorage.getItem('reddot_user_role') || null, // 'admin', 'event_manager', 'member'
+            teamId: localStorage.getItem('reddot_team_id') || null,
 
             setUser: (user) => {
                 if (user) {
@@ -67,8 +68,9 @@ export const useAppStore = create(
                 } else {
                     localStorage.removeItem('reddot_user');
                     localStorage.removeItem('reddot_user_role'); // Clear role on logout
+                    localStorage.removeItem('reddot_team_id');
                 }
-                set({ user, userRole: user ? get().userRole : null });
+                set({ user, userRole: user ? get().userRole : null, teamId: user ? get().teamId : null });
             },
 
             setUserRole: (role) => {
@@ -78,6 +80,15 @@ export const useAppStore = create(
                     localStorage.removeItem('reddot_user_role');
                 }
                 set({ userRole: role });
+            },
+
+            setTeamId: (teamId) => {
+                if (teamId) {
+                    localStorage.setItem('reddot_team_id', teamId);
+                } else {
+                    localStorage.removeItem('reddot_team_id');
+                }
+                set({ teamId });
             },
 
             // --- FIREBASE INFRASTRUCTURE ---
@@ -108,7 +119,11 @@ export const useAppStore = create(
                 editEvent: false,
                 importCSV: false,
                 eventDetails: false,
-                settings: false
+                settings: false,
+                payment: false,
+                teamInvite: false,
+                feedback: false,
+                legal: false
             },
             openModal: (modalName) => set((state) => ({
                 modals: { ...state.modals, [modalName]: true }

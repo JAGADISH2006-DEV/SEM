@@ -61,7 +61,7 @@ const SplashScreen = ({ onComplete }) => {
 
                         {/* Text: REDDOT */}
                         <div className="text-4xl md:text-6xl font-black text-white tracking-widest flex items-center">
-                            <span>RED</span>
+                            <span>ED</span>
                             <span className="font-light opacity-90">DOT</span>
                         </div>
                     </motion.div>

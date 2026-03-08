@@ -7,6 +7,7 @@ import EventCard from './EventCard';
 import { TrendingUp, Calendar, Clock, Trophy, Plus, FileUp, Zap, Sparkles, Shield, Bell, Target, ArrowRight } from 'lucide-react';
 import { format, isToday, isThisWeek, differenceInDays, startOfDay } from 'date-fns';
 import { cn } from '../utils';
+import { Link } from 'react-router-dom';
 
 const StatCard = ({ title, value, icon: Icon, color, delay, trend }) => (
     <motion.div
@@ -48,7 +49,7 @@ const Dashboard = () => {
 
     // Calculate statistics
     const stats = useMemo(() => {
-        if (!events) return null;
+        if (!events || events.length === 0) return { upcoming: 0, upcomingDeadlines: 0, thisWeek: 0, totalPrize: 0 };
         const now = new Date();
         const upcoming = events.filter(e => {
             const d = new Date(e.startDate);
@@ -58,7 +59,8 @@ const Dashboard = () => {
             const d = new Date(e.registrationDeadline);
             const today = startOfDay(new Date());
             const daysLeft = differenceInDays(startOfDay(d), today);
-            return !isNaN(d.getTime()) && daysLeft >= 0 && daysLeft <= 3 && (e.status === 'Open' || e.status === 'Deadline Today');
+            const isOpen = e.status === 'Open' || (e.status || '').includes('Today') || e.status === 'Registered';
+            return !isNaN(d.getTime()) && daysLeft >= 0 && daysLeft <= 3 && isOpen;
         });
         const thisWeek = events.filter(e => {
             const d = new Date(e.startDate);
@@ -75,12 +77,33 @@ const Dashboard = () => {
         };
     }, [events]);
 
-    const highPriorityEvents = useMemo(() => {
-        if (!events) return [];
-        return events
+    const displayEventsData = useMemo(() => {
+        if (!events) return { title: 'Priority', subtitle: 'Events', list: [] };
+
+        const now = startOfDay(new Date());
+
+        // Priority events logic remains
+        const priority = events
             .filter(e => (parseFloat(e.priorityScore) || 0) >= 60 && (e.status === 'Open' || (e.status || '').includes('Today')))
             .sort((a, b) => (b.priorityScore || 0) - (a.priorityScore || 0))
             .slice(0, 5);
+        if (priority.length > 0) return { title: 'Priority', subtitle: 'Events', list: priority };
+
+        // Fix: Upcoming events should be anything where startDate > now or registrationDeadline > now
+        const upcoming = events
+            .filter(e => {
+                const deadline = new Date(e.registrationDeadline);
+                const start = new Date(e.startDate);
+                return (!isNaN(deadline.getTime()) && deadline >= now) || (!isNaN(start.getTime()) && start >= now) || e.status === 'Open';
+            })
+            .sort((a, b) => {
+                const dateA = new Date(a.startDate).getTime() || new Date(a.registrationDeadline).getTime() || 0;
+                const dateB = new Date(b.startDate).getTime() || new Date(b.registrationDeadline).getTime() || 0;
+                return dateA - dateB;
+            })
+            .slice(0, 5);
+
+        return { title: 'Upcoming', subtitle: 'Events', list: upcoming };
     }, [events]);
 
     const criticalDeadlines = useMemo(() => {
@@ -175,15 +198,17 @@ const Dashboard = () => {
                 {/* Status Bar */}
                 <div className="mt-6 sm:mt-12 pt-4 sm:pt-8 border-t border-white/10 flex flex-wrap items-center gap-4 sm:gap-8 relative z-10">
                     <div className="flex items-center gap-3">
-                        <div className="w-2 h-2 rounded-full bg-emerald-500 shadow-[0_0_12px_rgba(16,185,129,0.8)]" />
-                        <span className="text-[9px] sm:text-[10px] font-black text-white/40 uppercase tracking-wider sm:tracking-widest">Sync: Live</span>
+                        <div className={cn("w-2 h-2 rounded-full shadow-[0_0_12px_rgba(16,185,129,0.8)]", events ? "bg-emerald-500" : "bg-amber-500 animate-pulse")} />
+                        <span className="text-[9px] sm:text-[10px] font-black text-white/40 uppercase tracking-wider sm:tracking-widest">
+                            {events ? 'Sync: Live' : 'Sync: Connecting...'}
+                        </span>
                     </div>
-                    <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-3 text-white/40">
                         <Zap size={14} className="text-amber-500" />
-                        <span className="text-[10px] font-black text-white/40 uppercase tracking-widest">Sync Latency: 4ms</span>
+                        <span className="text-[10px] font-black uppercase tracking-widest">Team: {useAppStore.getState().teamId || 'Personal Workspace'}</span>
                     </div>
                     <div className="flex items-center gap-3 ml-auto">
-                        <span className="text-[10px] font-black text-white/40 uppercase tracking-widest">Time: {format(new Date(), 'HH:mm:ss')}</span>
+                        <span className="text-[10px] font-black text-white/40 uppercase tracking-widest">Role: {userRole}</span>
                     </div>
                 </div>
             </div>
@@ -202,17 +227,17 @@ const Dashboard = () => {
                     <div className="flex items-center justify-between mb-4">
                         <div className="flex items-center gap-4">
                             <div className="w-1.5 h-8 bg-indigo-600 rounded-full" />
-                            <h2 className="text-3xl font-black text-slate-900 dark:text-white tracking-tight">Priority <span className="text-indigo-600">Events</span></h2>
+                            <h2 className="text-3xl font-black text-slate-900 dark:text-white tracking-tight">{displayEventsData.title} <span className="text-indigo-600">{displayEventsData.subtitle}</span></h2>
                         </div>
-                        <button className="text-xs font-black text-slate-400 hover:text-indigo-600 uppercase tracking-widest transition-colors flex items-center gap-2 group">
+                        <Link to="/events" className="z-10 text-xs font-black text-slate-400 hover:text-indigo-600 uppercase tracking-widest transition-colors flex items-center gap-2 group cursor-pointer p-2 -m-2">
                             View All Events
                             <ArrowRight size={14} className="group-hover:translate-x-1 transition-transform" />
-                        </button>
+                        </Link>
                     </div>
 
                     <div className="space-y-6">
-                        {highPriorityEvents.length > 0 ? (
-                            highPriorityEvents.map((event, idx) => (
+                        {displayEventsData.list.length > 0 ? (
+                            displayEventsData.list.map((event, idx) => (
                                 <motion.div
                                     key={event.id}
                                     initial={{ opacity: 0, x: -20 }}
@@ -276,9 +301,20 @@ const Dashboard = () => {
                                 </div>
                             </div>
                             <div className="p-5 sm:p-8 pt-4 sm:pt-6 bg-slate-50 dark:bg-slate-800/50 border-t border-slate-100 dark:border-slate-800">
-                                <button className="w-full py-4 bg-rose-600 text-white rounded-2xl font-black text-[10px] uppercase tracking-[0.3em] shadow-xl shadow-rose-500/20 hover:scale-105 active:scale-95 transition-all">
-                                    Analyze Risk Profiles
-                                </button>
+                                <div className="flex gap-4">
+                                    <button
+                                        onClick={() => window.location.hash = '#/inventory'}
+                                        className="flex-1 px-4 py-4 bg-emerald-600 text-white rounded-2xl font-black text-[9px] uppercase tracking-widest shadow-xl shadow-emerald-500/20 hover:scale-105 active:scale-95 transition-all"
+                                    >
+                                        Check Live Status
+                                    </button>
+                                    <button
+                                        onClick={() => window.location.hash = '#/analytics'}
+                                        className="flex-1 px-4 py-4 bg-indigo-600 text-white rounded-2xl font-black text-[9px] uppercase tracking-widest shadow-xl shadow-indigo-500/20 hover:scale-105 active:scale-95 transition-all"
+                                    >
+                                        Analyze Risk
+                                    </button>
+                                </div>
                             </div>
                         </div>
                     </div>

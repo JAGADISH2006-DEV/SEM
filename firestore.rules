@@ -31,5 +31,16 @@ service cloud.firestore {
       // END FIX
     }
 
+    match /payment_requests/{requestId} {
+      // Simplified for testing - any logged-in user can create a request
+      allow create: if request.auth != null;
+      
+      // Allow users to read their own requests
+      allow read: if request.auth != null && (resource == null || resource.data.userId == request.auth.uid);
+      
+      // Allow admins full access
+      allow read, update, delete: if getUserRole() == "admin";
+    }
+
   }
 }

@@ -1,6 +1,6 @@
 {
-    "name": "College Event Manager",
-    "short_name": "EventMgr",
+    "name": "SEM Student Event Manager",
+    "short_name": "SEM",
     "start_url": "/",
     "display": "standalone",
     "background_color": "#0f172a",

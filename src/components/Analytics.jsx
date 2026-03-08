@@ -5,7 +5,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAppStore } from '../store';
 import { db, EventType } from '../db';
 import EventCard from './EventCard';
-import { BarChart3, TrendingUp, Award, DollarSign, Target, Zap, Globe, Map } from 'lucide-react';
+import { BarChart3, TrendingUp, Award, DollarSign, Target, Zap, Globe, Map, Shield } from 'lucide-react';
 import { cn } from '../utils';
 
 const StatCard = ({ title, value, icon: Icon, subtitle, colorClass, delay = 0 }) => (
@@ -35,6 +35,8 @@ const Analytics = () => {
     // const navigate = useNavigate(); // Unused but kept for future
     // const setFilters = useAppStore((state) => state.setFilters); // Unused
     // const setViewMode = useAppStore((state) => state.setViewMode); // Unused
+    const userRole = useAppStore((state) => state.userRole);
+    const openPaymentModal = () => useAppStore.getState().openModal('payment');
 
     const events = useLiveQuery(() => db.events.toArray(), []);
     const [modalConfig, setModalConfig] = useState({ isOpen: false, type: null, title: '' });
@@ -123,7 +125,20 @@ const Analytics = () => {
 
     return (
         <div className="pb-20 relative">
-            <div className="mb-10">
+            {userRole === 'public' && (
+                <div className="absolute inset-0 bg-white/70 dark:bg-slate-900/70 backdrop-blur-md z-50 flex flex-col items-center justify-center p-6 text-center rounded-3xl mt-24">
+                    <div className="w-16 h-16 bg-rose-50 dark:bg-rose-900/30 text-rose-500 rounded-full flex items-center justify-center mb-4 shadow-xl">
+                        <Shield size={32} />
+                    </div>
+                    <h3 className="text-2xl font-black tracking-tight text-slate-900 dark:text-white mb-2">Team Edition Required</h3>
+                    <p className="text-sm font-bold text-slate-500 mb-6 max-w-md">Advanced analytics, ROI tracking, and performance metics are reserved for Team Edition members. Upgrade to unlock your team's potential.</p>
+                    <button onClick={openPaymentModal} className="px-8 py-4 bg-indigo-600 text-white rounded-2xl text-xs font-black uppercase tracking-widest shadow-xl shadow-indigo-500/30 hover:bg-indigo-700 transition-all hover:scale-105 active:scale-95 cursor-pointer">
+                        Upgrade to Team Edition
+                    </button>
+                </div>
+            )}
+
+            <div className={cn("mb-10", userRole === 'public' && "opacity-20 blur-sm pointer-events-none")}>
                 <h1 className="text-4xl font-extrabold text-slate-900 dark:text-white tracking-tight mb-2">
                     Performance <span className="text-indigo-600">Analytics</span>
                 </h1>
@@ -131,7 +146,7 @@ const Analytics = () => {
             </div>
 
             {/* Top Metrics */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+            <div className={cn("grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8", userRole === 'public' && "opacity-20 blur-sm pointer-events-none")}>
                 <div onClick={() => openAnalyticsModal('participated', 'Total Participations')} className="cursor-pointer transition-transform hover:scale-[1.02] active:scale-95">
                     <StatCard
                         title="Total Participations"

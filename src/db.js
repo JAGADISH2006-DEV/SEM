@@ -21,7 +21,7 @@ export class EventDatabase extends Dexie {
 
         // ++id means auto-incrementing primary key
         this.version(1).stores({
-            events: '++id, collegeName, eventName, eventType, registrationDeadline, startDate, endDate, status, priorityScore, createdAt, contact1, contact2, leader, prizeWon, isShortlisted, serverId',
+            events: '++id, collegeName, eventName, eventType, registrationDeadline, startDate, endDate, status, priorityScore, createdAt, contact1, contact2, leader, prizeWon, isShortlisted, serverId, teamId, createdBy',
             colleges: '++id, name, location, pastEvents',
             notes: '++id, eventId, content, createdAt',
             settings: 'key, value'
@@ -77,6 +77,7 @@ export const createEvent = ({
     posterUrl = '',
     posterBlob = null,
     website = '',
+    registrationLink = '',
     description = '',
     teamSize = 1,
     teamName = '',
@@ -93,6 +94,8 @@ export const createEvent = ({
     createdAt = null,
     updatedAt = null,
     serverId = null,
+    teamId = null,
+    createdBy = null,
     id = null
 }) => {
     const now = new Date();
@@ -117,6 +120,7 @@ export const createEvent = ({
         posterUrl,
         posterBlob,
         website,
+        registrationLink,
         description,
         teamSize,
         teamName,
@@ -130,6 +134,8 @@ export const createEvent = ({
         customReminders,
         tags,
         isShortlisted: !!isShortlisted,
+        teamId: teamId || null,
+        createdBy: createdBy || null,
         createdAt: createdAt ? new Date(createdAt) : now,
         updatedAt: updatedAt ? new Date(updatedAt) : now
     };

@@ -8,7 +8,7 @@
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import { useAppStore } from '../store';
-import { loginUser, registerUser, initFirebase, getUserRole } from '../services/firebase';
+import { loginUser, registerUser, initFirebase, getUserData } from '../services/firebase';
 import { Shield, Lock, Mail, Loader2, AlertCircle } from 'lucide-react';
 
 const Login = () => {
@@ -17,6 +17,11 @@ const Login = () => {
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [name, setName] = useState('');
+    const [mobile, setMobile] = useState('');
+    const [college, setCollege] = useState('');
+    const [department, setDepartment] = useState('');
+    const [year, setYear] = useState('');
+    const [section, setSection] = useState('');
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState('');
 
@@ -45,12 +50,13 @@ const Login = () => {
 
             if (isRegistering) {
                 // Execute Firebase "Create User" logic
-                const userCredential = await registerUser(email, password, name);
+                const userCredential = await registerUser(email, password, name, { mobile, college, department, year, section });
                 setUser(userCredential.user);    // Save user to the "Brain" (Store)
 
                 // Fetch and set role
-                const role = await getUserRole(userCredential.user.uid);
-                setUserRole(role);
+                const userData = await getUserData(userCredential.user.uid);
+                setUserRole(userData.role);
+                useAppStore.getState().setTeamId(userData.teamId);
 
                 setCloudProvider('firestore');   // Activate cloud sync
             } else {
@@ -59,8 +65,9 @@ const Login = () => {
                 setUser(userCredential.user);    // Save user to the "Brain" (Store)
 
                 // Fetch and set role
-                const role = await getUserRole(userCredential.user.uid);
-                setUserRole(role);
+                const userData = await getUserData(userCredential.user.uid);
+                setUserRole(userData.role);
+                useAppStore.getState().setTeamId(userData.teamId);
 
                 setCloudProvider('firestore');   // Activate cloud sync
             }
@@ -114,19 +121,63 @@ const Login = () => {
                     <form onSubmit={handleAuth} className="space-y-6">
                         <div className="space-y-4">
                             {isRegistering && (
-                                <div className="relative group">
-                                    <div className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-indigo-500 transition-colors">
-                                        <Shield size={18} />
+                                <>
+                                    <div className="relative group">
+                                        <div className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-indigo-500 transition-colors">
+                                            <Shield size={18} />
+                                        </div>
+                                        <input
+                                            type="text"
+                                            required
+                                            value={name}
+                                            onChange={(e) => setName(e.target.value)}
+                                            placeholder="Full Name"
+                                            className="w-full pl-11 pr-4 py-3 bg-slate-50 dark:bg-slate-800 border focus:border-indigo-500 rounded-xl outline-none font-semibold transition-all"
+                                        />
                                     </div>
+                                    <input
+                                        type="tel"
+                                        required
+                                        value={mobile}
+                                        onChange={(e) => setMobile(e.target.value)}
+                                        placeholder="Mobile Number"
+                                        className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-800 border focus:border-indigo-500 rounded-xl outline-none font-semibold transition-all"
+                                    />
                                     <input
                                         type="text"
                                         required
-                                        value={name}
-                                        onChange={(e) => setName(e.target.value)}
-                                        placeholder="Full Name"
-                                        className="input pl-11 !py-3 font-semibold"
+                                        value={college}
+                                        onChange={(e) => setCollege(e.target.value)}
+                                        placeholder="College Name"
+                                        className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-800 border focus:border-indigo-500 rounded-xl outline-none font-semibold transition-all"
                                     />
-                                </div>
+                                    <div className="grid grid-cols-3 gap-3">
+                                        <input
+                                            type="text"
+                                            required
+                                            value={department}
+                                            onChange={(e) => setDepartment(e.target.value)}
+                                            placeholder="Dept"
+                                            className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-800 border focus:border-indigo-500 rounded-xl outline-none font-semibold transition-all"
+                                        />
+                                        <input
+                                            type="text"
+                                            required
+                                            value={year}
+                                            onChange={(e) => setYear(e.target.value)}
+                                            placeholder="Year"
+                                            className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-800 border focus:border-indigo-500 rounded-xl outline-none font-semibold transition-all"
+                                        />
+                                        <input
+                                            type="text"
+                                            required
+                                            value={section}
+                                            onChange={(e) => setSection(e.target.value)}
+                                            placeholder="Section"
+                                            className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-800 border focus:border-indigo-500 rounded-xl outline-none font-semibold transition-all"
+                                        />
+                                    </div>
+                                </>
                             )}
 
                             <div className="relative group">

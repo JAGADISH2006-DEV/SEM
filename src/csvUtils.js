@@ -19,7 +19,8 @@ const COLUMN_MAPPINGS = {
     contact1: ['contact - 1', 'contact1'],
     contact2: ['contact - 2', 'contact2'],
     posterUrl: ['poster', 'poster link', 'image', 'poster url', 'posters'],
-    website: ['website', 'url', 'link', 'registration link'],
+    website: ['website', 'url', 'link', 'official link', 'official website'],
+    registrationLink: ['registration link', 'registration', 'reg link', 'google form', 'form link'],
     description: ['description', 'details', 'about'],
     teamSize: ['team size', 'team'],
     leader: ['leader'],
@@ -166,6 +167,7 @@ export const transformRow = (row, columnMapping) => {
             case 'description':
             case 'eligibility':
             case 'website':
+            case 'registrationLink':
                 event[field] = String(value).trim();
                 break;
 
@@ -306,6 +308,7 @@ export const exportToCSV = (events) => {
             'Status',
             'Priority Score',
             'Website',
+            'Registration Link',
             'Description',
             'Team Size',
             'Eligibility',
