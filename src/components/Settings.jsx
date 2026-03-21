@@ -457,22 +457,24 @@ const Settings = () => {
                 </div>
             </SettingSection>
 
-            <SettingSection title="Data & Security" description="Export and database maintenance" icon={Database}>
-                <div className="space-y-4">
-                    <button onClick={handleExport} className="w-full btn btn-secondary h-14 flex justify-between items-center px-6">
-                        <div className="flex items-center gap-4"><Download size={20} /><div className="text-left"><p className="font-bold">Backup Repository</p><p className="text-xs opacity-60">Export all events to CSV</p></div></div>
-                        <ChevronRight size={18} />
-                    </button>
-                    <button onClick={handleCleanup} className="w-full btn btn-secondary h-14 flex justify-between items-center px-6">
-                        <div className="flex items-center gap-4"><Database size={20} className="text-secondary" /><div className="text-left"><p className="font-bold">Cleanup Database</p><p className="text-xs opacity-60">Remove duplicates & garbage data</p></div></div>
-                        <ChevronRight size={18} />
-                    </button>
-                    <button onClick={handleClearAll} className="w-full h-14 flex justify-between items-center px-6 bg-amber-50 dark:bg-amber-500/10 text-amber-600 rounded-2xl border border-amber-100 dark:border-amber-500/20">
-                        <div className="flex items-center gap-4"><Trash2 size={20} /><div className="text-left"><p className="font-bold">Wipe Local Database</p><p className="text-xs opacity-60">Reset internal event storage</p></div></div>
-                        <ChevronRight size={18} />
-                    </button>
-                </div>
-            </SettingSection>
+            {(userRole === 'admin' || userRole === 'event_manager') && (
+                <SettingSection title="Data & Security" description="Export and database maintenance" icon={Database}>
+                    <div className="space-y-4">
+                        <button onClick={handleExport} className="w-full btn btn-secondary h-14 flex justify-between items-center px-6">
+                            <div className="flex items-center gap-4"><Download size={20} /><div className="text-left"><p className="font-bold">Backup Repository</p><p className="text-xs opacity-60">Export all events to CSV</p></div></div>
+                            <ChevronRight size={18} />
+                        </button>
+                        <button onClick={handleCleanup} className="w-full btn btn-secondary h-14 flex justify-between items-center px-6">
+                            <div className="flex items-center gap-4"><Database size={20} className="text-secondary" /><div className="text-left"><p className="font-bold">Cleanup Database</p><p className="text-xs opacity-60">Remove duplicates & garbage data</p></div></div>
+                            <ChevronRight size={18} />
+                        </button>
+                        <button onClick={handleClearAll} className="w-full h-14 flex justify-between items-center px-6 bg-amber-50 dark:bg-amber-500/10 text-amber-600 rounded-2xl border border-amber-100 dark:border-amber-500/20">
+                            <div className="flex items-center gap-4"><Trash2 size={20} /><div className="text-left"><p className="font-bold">Wipe Local Database</p><p className="text-xs opacity-60">Reset internal event storage</p></div></div>
+                            <ChevronRight size={18} />
+                        </button>
+                    </div>
+                </SettingSection>
+            )}
 
             <div className="glass-card p-8 flex flex-col md:flex-row gap-8 items-center border-dashed border-2 border-slate-200 dark:border-slate-800 bg-transparent shadow-none">
                 <Shield size={32} className="text-slate-400" />
