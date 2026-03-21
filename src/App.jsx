@@ -41,6 +41,7 @@ const JoinTeam = lazy(() => import('./components/JoinTeam'));
 const FeedbackModal = lazy(() => import('./components/FeedbackModal'));
 const ProfileModal = lazy(() => import('./components/ProfileModal'));
 const LegalModal = lazy(() => import('./components/LegalModal'));
+const AdminPanel = lazy(() => import('./components/AdminPanel'));
 
 /**
  * 🔄 Animated Routes Container
@@ -90,6 +91,7 @@ function AnimatedRoutes() {
                 <Route path="/analytics" element={<Suspense fallback={null}><Analytics /></Suspense>} />
                 <Route path="/settings" element={<Suspense fallback={null}><Settings /></Suspense>} />
                 <Route path="/discovery" element={<Suspense fallback={null}><Discovery /></Suspense>} />
+                <Route path="/admin" element={<Suspense fallback={null}><AdminPanel /></Suspense>} />
                 <Route path="/invite/:teamId" element={<Suspense fallback={null}><JoinTeam /></Suspense>} />
                 <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>

@@ -1,0 +1,393 @@
+import React, { useState, useEffect, useMemo } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { 
+    Users, 
+    Calendar, 
+    Shield, 
+    CheckCircle2, 
+    XCircle, 
+    Clock, 
+    Search, 
+    Filter, 
+    MoreVertical, 
+    UserPlus, 
+    Trash2, 
+    Edit, 
+    Plus, 
+    Trophy,
+    ArrowRight,
+    Loader2,
+    Zap,
+    CreditCard
+} from 'lucide-react';
+import { useAppStore } from '../store';
+import { useLiveQuery } from 'dexie-react-hooks';
+import { db } from '../db';
+import { 
+    getAllUsers, 
+    updateUserRole, 
+    getPaymentRequests, 
+    approvePaymentRequest, 
+    rejectPaymentRequest,
+    deleteEventFromFirestore
+} from '../services/firebase';
+import { format } from 'date-fns';
+import { cn } from '../utils';
+
+const AdminPanel = () => {
+    const userRole = useAppStore((state) => state.userRole);
+    const openModal = useAppStore((state) => state.openModal);
+    const setSelectedEvent = useAppStore((state) => state.setSelectedEvent);
+
+    const [activeTab, setActiveTab] = useState('events'); // 'events', 'users', 'payments'
+    const [isLoading, setIsLoading] = useState(true);
+    const [searchQuery, setSearchQuery] = useState('');
+    
+    // Data states
+    const [users, setUsers] = useState([]);
+    const [payments, setPayments] = useState([]);
+    const localEvents = useLiveQuery(() => db.events.toArray(), []) || [];
+
+    // Security Check
+    if (userRole !== 'admin' && userRole !== 'event_manager') {
+        return (
+            <div className="flex flex-col items-center justify-center min-h-[60vh] text-center p-8">
+                <div className="w-20 h-20 bg-rose-50 dark:bg-rose-900/30 rounded-3xl flex items-center justify-center text-rose-500 mb-6 border-2 border-rose-100 dark:border-rose-800 animate-pulse">
+                    <Shield size={40} />
+                </div>
+                <h1 className="text-3xl font-black text-slate-900 dark:text-white mb-2 uppercase tracking-tight">Access Denied</h1>
+                <p className="text-slate-500 font-bold max-w-sm">This sector is reserved for Administrative Intelligence. Redirecting unauthorized units...</p>
+            </div>
+        );
+    }
+
+    useEffect(() => {
+        const fetchData = async () => {
+            setIsLoading(true);
+            try {
+                const [allUsers, allPayments] = await Promise.all([
+                    getAllUsers(),
+                    getPaymentRequests()
+                ]);
+                setUsers(allUsers);
+                setPayments(allPayments);
+            } catch (err) {
+                console.error("Failed to fetch admin data:", err);
+            } finally {
+                setIsLoading(false);
+            }
+        };
+
+        if (activeTab === 'users' || activeTab === 'payments') {
+            fetchData();
+        } else {
+            setIsLoading(false);
+        }
+    }, [activeTab]);
+
+    const handleRoleUpdate = async (uid, newRole) => {
+        try {
+            await updateUserRole(uid, newRole);
+            setUsers(prev => prev.map(u => u.id === uid ? { ...u, role: newRole } : u));
+        } catch (err) {
+            console.error("Role update failed:", err);
+        }
+    };
+
+    const handlePaymentAction = async (request, action) => {
+        try {
+            if (action === 'approve') {
+                await approvePaymentRequest(request.id, request.userId, request.planRole);
+                setPayments(prev => prev.map(p => p.id === request.id ? { ...p, status: 'approved' } : p));
+                // Update local user role if they are in the loaded users list
+                setUsers(prev => prev.map(u => u.id === request.userId ? { ...u, role: request.planRole } : u));
+            } else {
+                await rejectPaymentRequest(request.id, "Payment verification unsuccessful.");
+                setPayments(prev => prev.map(p => p.id === request.id ? { ...p, status: 'rejected' } : p));
+            }
+        } catch (err) {
+            console.error("Payment action failed:", err);
+        }
+    };
+
+    const handleDeleteEvent = async (event) => {
+        if (!window.confirm(`Are you sure you want to permanently delete event: ${event.eventName}?`)) return;
+        
+        try {
+            // Delete from local DB
+            await db.events.delete(event.id);
+            // Delete from Firestore if serverId exists
+            if (event.serverId) {
+                await deleteEventFromFirestore(event.serverId);
+            }
+        } catch (err) {
+            console.error("Failed to delete event:", err);
+        }
+    };
+
+    const tabs = [
+        { id: 'events', label: 'Matrix Control', icon: Calendar, description: 'Manage global events & data streams' },
+        { id: 'users', label: 'Unit Directory', icon: Users, description: 'User roles & system permissions' },
+        { id: 'payments', label: 'Financial Grid', icon: CreditCard, description: 'Manual verification & subscriptions' }
+    ];
+
+    return (
+        <div className="pb-32 pt-4 sm:pt-8">
+            {/* Admin Banner */}
+            <div className="relative mb-12 overflow-hidden bg-slate-900 rounded-[2.5rem] p-8 sm:p-12 shadow-2xl border border-white/5 group">
+                <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-indigo-600/20 blur-[150px] rounded-full translate-x-1/2 -translate-y-1/2" />
+                
+                <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-8">
+                    <div>
+                        <div className="inline-flex items-center gap-2 px-3 py-1 bg-white/5 rounded-lg text-[9px] font-black uppercase tracking-[0.3em] text-indigo-400 mb-6 border border-white/10">
+                            <Shield size={12} /> ADMINISTRATIVE INTELLIGENCE PANEL
+                        </div>
+                        <h1 className="text-4xl sm:text-6xl font-black text-white tracking-tighter leading-none mb-4">
+                            Operational <span className="bg-gradient-to-r from-indigo-400 to-violet-400 bg-clip-text text-transparent">Command</span>
+                        </h1>
+                        <p className="text-slate-400 font-bold max-w-xl text-sm leading-relaxed">
+                            Welcome, Founder. Manage the global event matrix, verify personnel credentials, and monitor system-wide transaction logs from this interface.
+                        </p>
+                    </div>
+
+                    <div className="flex flex-wrap gap-4">
+                        <div className="px-6 py-4 bg-white/5 backdrop-blur-md rounded-2xl border border-white/10 text-center flex-1 sm:flex-none min-w-[120px]">
+                            <span className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1">Global Events</span>
+                            <span className="text-2xl font-black text-white">{(localEvents || []).length}</span>
+                        </div>
+                        <div className="px-6 py-4 bg-white/5 backdrop-blur-md rounded-2xl border border-white/10 text-center flex-1 sm:flex-none min-w-[120px]">
+                            <span className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1">Total Units</span>
+                            <span className="text-2xl font-black text-indigo-400">{users.length || '--'}</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            {/* Tab Navigation */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
+                {tabs.map(tab => {
+                    const Icon = tab.icon;
+                    const isActive = activeTab === tab.id;
+                    return (
+                        <button
+                            key={tab.id}
+                            onClick={() => setActiveTab(tab.id)}
+                            className={cn(
+                                "relative p-6 rounded-[2rem] border-2 transition-all group overflow-hidden text-left",
+                                isActive 
+                                    ? "bg-white dark:bg-slate-900 border-indigo-600 shadow-xl" 
+                                    : "bg-slate-50 dark:bg-slate-900/50 border-slate-100 dark:border-slate-800 hover:border-slate-300"
+                            )}
+                        >
+                            {isActive && <div className="absolute top-0 right-0 w-24 h-24 bg-indigo-600/5 rounded-full translate-x-1/2 -translate-y-1/2" />}
+                            <div className={cn(
+                                "w-12 h-12 rounded-2xl flex items-center justify-center mb-6 transition-transform group-hover:scale-110",
+                                isActive ? "bg-indigo-600 text-white shadow-lg" : "bg-white dark:bg-slate-800 text-slate-400"
+                            )}>
+                                <Icon size={24} />
+                            </div>
+                            <h3 className={cn("text-lg font-black uppercase tracking-tighter mb-1", isActive ? "text-slate-900 dark:text-white" : "text-slate-500")}>
+                                {tab.label}
+                            </h3>
+                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{tab.description}</p>
+                        </button>
+                    );
+                })}
+            </div>
+
+            {/* Content Area */}
+            <div className="bg-white dark:bg-slate-900 rounded-[3rem] shadow-2xl border border-slate-100 dark:border-slate-800 overflow-hidden min-h-[500px]">
+                {/* Search Bar / Actions */}
+                <div className="p-8 border-b border-slate-50 dark:border-slate-800 flex flex-col md:flex-row md:items-center justify-between gap-6">
+                    <div className="relative flex-1 max-w-md">
+                        <Search className="absolute left-6 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+                        <input
+                            type="text"
+                            placeholder="Search directory..."
+                            value={searchQuery}
+                            onChange={(e) => setSearchQuery(e.target.value)}
+                            className="w-full pl-14 pr-6 py-4 bg-slate-50 dark:bg-slate-800/50 rounded-2xl outline-none font-bold text-sm border-2 border-transparent focus:border-indigo-600 transition-all"
+                        />
+                    </div>
+                    
+                    {activeTab === 'events' && (
+                        <button 
+                            onClick={() => openModal('addEvent')}
+                            className="px-8 py-4 bg-slate-900 dark:bg-white text-white dark:text-slate-900 rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-xl hover:scale-105 transition-all flex items-center gap-3"
+                        >
+                            <Plus size={18} strokeWidth={3} /> Inject Global Event
+                        </button>
+                    )}
+                </div>
+
+                <div className="p-0 sm:p-2">
+                    {isLoading ? (
+                        <div className="py-40 text-center">
+                            <Loader2 size={40} className="mx-auto text-indigo-600 animate-spin mb-4" />
+                            <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Synchronizing Matrix Data...</p>
+                        </div>
+                    ) : (
+                        <AnimatePresence mode="wait">
+                            <motion.div
+                                key={activeTab}
+                                initial={{ opacity: 0, x: 20 }}
+                                animate={{ opacity: 1, x: 0 }}
+                                exit={{ opacity: 0, x: -20 }}
+                                className="p-6 sm:p-8"
+                            >
+                                {activeTab === 'events' && (
+                                    <div className="space-y-4">
+                                        <div className="hidden sm:grid grid-cols-12 gap-6 px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-50 dark:border-slate-800">
+                                            <div className="col-span-6">Event Identity</div>
+                                            <div className="col-span-3">Status</div>
+                                            <div className="col-span-1 text-center">Priority</div>
+                                            <div className="col-span-2 text-right">Actions</div>
+                                        </div>
+                                        {localEvents.filter(e => e.eventName.toLowerCase().includes(searchQuery.toLowerCase())).map(event => (
+                                            <div key={event.id} className="grid grid-cols-1 sm:grid-cols-12 gap-4 sm:gap-6 items-center px-6 py-5 rounded-3xl bg-slate-50/50 dark:bg-slate-800/30 border border-slate-100 dark:border-slate-800 hover:bg-white dark:hover:bg-slate-800 transition-all group">
+                                                <div className="col-span-1 sm:col-span-6 flex items-center gap-4">
+                                                    <div className="w-12 h-12 bg-white dark:bg-slate-900 rounded-xl flex items-center justify-center border border-slate-200 dark:border-slate-700 shadow-sm">
+                                                        <Calendar size={20} className="text-indigo-600" />
+                                                    </div>
+                                                    <div>
+                                                        <h4 className="font-black text-slate-900 dark:text-white uppercase tracking-tighter sm:text-lg">{event.eventName}</h4>
+                                                        <p className="text-[10px] font-bold text-slate-400 uppercase">{event.collegeName}</p>
+                                                    </div>
+                                                </div>
+                                                <div className="col-span-1 sm:col-span-3">
+                                                    <span className={cn(
+                                                        "px-3 py-1 rounded-lg text-[9px] font-black uppercase tracking-widest border",
+                                                        event.status === 'Open' ? "bg-emerald-50 text-emerald-600 border-emerald-100" :
+                                                        event.status === 'Closed' ? "bg-rose-50 text-rose-600 border-rose-100" : "bg-indigo-50 text-indigo-600 border-indigo-100"
+                                                    )}>
+                                                        {event.status || 'ACTIVE'}
+                                                    </span>
+                                                </div>
+                                                <div className="col-span-1 sm:col-span-1 flex justify-center">
+                                                    <div className="w-10 h-10 rounded-xl border-2 border-slate-100 dark:border-slate-700 flex items-center justify-center font-black text-xs text-slate-900 dark:text-white">
+                                                        {event.priorityScore}
+                                                    </div>
+                                                </div>
+                                                <div className="col-span-1 sm:col-span-2 flex justify-end gap-2">
+                                                    <button 
+                                                        onClick={() => { setSelectedEvent(event.id); openModal('editEvent'); }}
+                                                        className="w-10 h-10 bg-white dark:bg-slate-900 text-slate-400 hover:text-indigo-600 rounded-xl flex items-center justify-center border border-slate-100 dark:border-slate-700 transition-all"
+                                                    >
+                                                        <Edit size={16} />
+                                                    </button>
+                                                    <button 
+                                                        onClick={() => handleDeleteEvent(event)}
+                                                        className="w-10 h-10 bg-rose-50 text-rose-400 hover:bg-rose-500 hover:text-white rounded-xl flex items-center justify-center border border-rose-100 transition-all"
+                                                    >
+                                                        <Trash2 size={16} />
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+
+                                {activeTab === 'users' && (
+                                    <div className="space-y-4">
+                                        {users.filter(u => u.email?.toLowerCase().includes(searchQuery.toLowerCase()) || u.displayName?.toLowerCase().includes(searchQuery.toLowerCase())).map(u => (
+                                            <div key={u.id} className="flex flex-col sm:flex-row sm:items-center justify-between gap-6 p-6 rounded-3xl bg-slate-50/50 dark:bg-slate-800/30 border border-slate-100 dark:border-slate-800">
+                                                <div className="flex items-center gap-5">
+                                                    <div className="w-14 h-14 bg-indigo-600 rounded-2xl overflow-hidden flex items-center justify-center text-white font-black text-lg">
+                                                        {u.photoURL ? <img src={u.photoURL} alt={u.displayName} className="w-full h-full object-cover" /> : (u.displayName || 'U').substring(0, 1).toUpperCase()}
+                                                    </div>
+                                                    <div>
+                                                        <h4 className="font-black text-slate-900 dark:text-white uppercase tracking-tight">{u.displayName || 'System Unit'}</h4>
+                                                        <p className="text-xs font-bold text-slate-400">{u.email}</p>
+                                                        <div className="flex gap-2 mt-2">
+                                                            <span className="px-2 py-0.5 bg-indigo-50 dark:bg-indigo-900/40 text-indigo-600 text-[8px] font-black uppercase tracking-widest rounded border border-indigo-100">{u.role}</span>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                                <div className="flex items-center gap-3">
+                                                    <select 
+                                                        value={u.role} 
+                                                        onChange={(e) => handleRoleUpdate(u.id, e.target.value)}
+                                                        className="bg-white dark:bg-slate-900 border-2 border-slate-100 dark:border-slate-800 rounded-xl px-4 py-2.5 text-[10px] font-black uppercase tracking-widest outline-none focus:border-indigo-600"
+                                                    >
+                                                        <option value="public">Public</option>
+                                                        <option value="team_leader">Team Leader</option>
+                                                        <option value="event_manager">Event Manager</option>
+                                                        <option value="admin">Administrator</option>
+                                                    </select>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+
+                                {activeTab === 'payments' && (
+                                    <div className="space-y-6">
+                                        {payments.length === 0 && (
+                                            <div className="py-20 text-center opacity-40">
+                                                <CreditCard size={48} className="mx-auto mb-4" />
+                                                <p className="font-black uppercase tracking-widest text-[10px]">No pending financial requests.</p>
+                                            </div>
+                                        )}
+                                        {payments.map(req => (
+                                            <div key={req.id} className="p-8 rounded-[2.5rem] bg-slate-50/50 dark:bg-slate-800/30 border border-slate-100 dark:border-slate-800">
+                                                <div className="flex flex-col lg:flex-row justify-between gap-8">
+                                                    <div className="space-y-4 flex-1">
+                                                        <div className="flex items-center gap-3">
+                                                            <div className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
+                                                            <span className="text-[10px] font-black text-amber-600 uppercase tracking-widest">Pending Verification</span>
+                                                        </div>
+                                                        <h4 className="text-xl font-black text-slate-900 dark:text-white uppercase tracking-tighter leading-none">
+                                                            {req.userName} requested <span className="text-indigo-600">{req.planName}</span>
+                                                        </h4>
+                                                        <div className="grid grid-cols-2 gap-4 pt-4">
+                                                            <div className="p-4 bg-white dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-slate-800">
+                                                                <span className="block text-[8px] font-black text-slate-400 uppercase tracking-widest mb-1">Transaction Link</span>
+                                                                <a href={req.transactionUrl} target="_blank" rel="noreferrer" className="text-xs font-bold text-indigo-600 hover:underline truncate block">View Receipt/Transfer</a>
+                                                            </div>
+                                                            <div className="p-4 bg-white dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-slate-800">
+                                                                <span className="block text-[8px] font-black text-slate-400 uppercase tracking-widest mb-1">Request Intelligence</span>
+                                                                <span className="text-xs font-bold text-slate-500">UID: {req.userId?.substring(0, 10)}...</span>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+
+                                                    <div className="flex flex-row lg:flex-col justify-end gap-3 min-w-[200px]">
+                                                        {req.status === 'pending' ? (
+                                                            <>
+                                                                <button 
+                                                                    onClick={() => handlePaymentAction(req, 'approve')}
+                                                                    className="flex-1 lg:flex-none py-4 bg-emerald-600 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest flex items-center justify-center gap-2 hover:scale-105 transition-all shadow-lg"
+                                                                >
+                                                                    <CheckCircle2 size={16} /> Approve
+                                                                </button>
+                                                                <button 
+                                                                    onClick={() => handlePaymentAction(req, 'reject')}
+                                                                    className="flex-1 lg:flex-none py-4 bg-rose-50 text-rose-600 rounded-2xl font-black text-[10px] uppercase tracking-widest flex items-center justify-center gap-2 hover:bg-rose-100 transition-all border border-rose-100"
+                                                                >
+                                                                    <XCircle size={16} /> Reject
+                                                                </button>
+                                                            </>
+                                                        ) : (
+                                                            <div className={cn(
+                                                                "py-4 rounded-2xl text-center font-black text-[10px] uppercase tracking-[0.2em] border",
+                                                                req.status === 'approved' ? "bg-emerald-50 text-emerald-600 border-emerald-200" : "bg-rose-50 text-rose-600 border-rose-200"
+                                                            )}>
+                                                                {req.status}
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                            </motion.div>
+                        </AnimatePresence>
+                    )}
+                </div>
+            </div>
+        </div>
+    );
+};
+
+export default AdminPanel;

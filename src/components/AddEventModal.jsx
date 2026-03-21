@@ -137,14 +137,16 @@ const AddEventModal = () => {
         e.preventDefault();
         setIsSubmitting(true);
         try {
-            const { teamId, user } = useAppStore.getState();
+            const { teamId, user, userRole } = useAppStore.getState();
+            const isAdmin = userRole === 'admin' || userRole === 'event_manager';
+            
             const eventData = {
                 ...formData,
                 prizeAmount: parseFloat(formData.prizeAmount) || 0,
                 registrationFee: parseFloat(formData.registrationFee) || 0,
                 teamSize: parseInt(formData.teamSize) || 1,
                 contactNumbers: formData.contactNumbers.split(',').map(c => c.trim()).filter(Boolean),
-                teamId: teamId || null,
+                teamId: isAdmin ? null : (teamId || null),
                 createdBy: user?.uid || 'unknown'
             };
             await addEvent(eventData);

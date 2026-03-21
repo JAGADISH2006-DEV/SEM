@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { useAppStore } from '../store';
 import { logoutUser } from '../services/firebase';
-import { Moon, Sun, Plus, Zap, LogOut, Settings as SettingsIcon, User, MessageSquare, Crown, CreditCard, FileText, ChevronDown } from 'lucide-react';
+import { Moon, Sun, Plus, Zap, LogOut, Settings as SettingsIcon, User, MessageSquare, Crown, CreditCard, FileText, ChevronDown, Shield } from 'lucide-react';
 import { cn } from '../utils';
 
 const Header = () => {
@@ -13,7 +13,7 @@ const Header = () => {
     const user = useAppStore((state) => state.user);
     const cloudProvider = useAppStore((state) => state.cloudProvider);
     const userRole = useAppStore((state) => state.userRole);
-    const canAdd = userRole === 'admin' || userRole === 'event_manager' || userRole === 'team_leader';
+    const canAdd = userRole === 'admin' || userRole === 'event_manager';
 
     const [isProfileOpen, setIsProfileOpen] = useState(false);
     const profileRef = useRef(null);
@@ -144,6 +144,16 @@ const Header = () => {
                                             <p className="text-xs font-bold text-slate-900 dark:text-white truncate">{user.displayName || 'No Name'}</p>
                                             <p className="text-[10px] text-indigo-500 truncate font-bold">{user.email}</p>
                                         </div>
+
+                                        {(userRole === 'admin' || userRole === 'event_manager') && (
+                                            <Link
+                                                to="/admin"
+                                                onClick={() => setIsProfileOpen(false)}
+                                                className="flex items-center gap-3 px-4 py-3 mx-2 mt-1 mb-2 rounded-xl text-xs font-black uppercase tracking-widest bg-slate-900 dark:bg-white text-white dark:text-slate-900 hover:scale-[1.02] transition-all shadow-lg"
+                                            >
+                                                <Shield size={16} /> Admin Terminal
+                                            </Link>
+                                        )}
 
                                         <button
                                             onClick={() => { setIsProfileOpen(false); openModal('profile'); }}

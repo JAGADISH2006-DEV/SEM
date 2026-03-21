@@ -103,7 +103,7 @@ const EventDetailsModal = () => {
     const selectedEvent = useAppStore((state) => state.selectedEvent);
     const isOpen = modals.eventDetails;
     const userRole = useAppStore((state) => state.userRole);
-    const canManage = userRole === 'admin' || userRole === 'event_manager' || userRole === 'team_leader';
+    const canManage = userRole === 'admin' || userRole === 'event_manager';
 
     const event = useLiveQuery(
         () => selectedEvent ? db.events.get(selectedEvent) : null,

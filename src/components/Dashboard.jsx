@@ -140,13 +140,12 @@ const Dashboard = () => {
 
     const priorityEvents = useMemo(() => {
         return events
-            .filter(e => !e.status || e.status === 'Interested' || e.status === 'Ongoing')
+            .filter(e => e.priorityScore >= 70)
             .sort((a, b) => (b.priorityScore || 0) - (a.priorityScore || 0))
-            .slice(0, 3);
+            .slice(0, 5);
     }, [events]);
 
-    // Role-based visibility logic
-    const canManage = userRole === 'admin' || userRole === 'event_manager' || userRole === 'team_leader';
+    const canManage = userRole === 'admin' || userRole === 'event_manager';
 
     const containerVariants = {
         hidden: { opacity: 0 },
@@ -195,7 +194,16 @@ const Dashboard = () => {
                         </p>
                     </div>
 
-                    <div className="flex items-center gap-4">
+                    <div className="flex flex-wrap items-center gap-4">
+                        {(userRole === 'admin' || userRole === 'event_manager') && (
+                            <Link 
+                                to="/admin"
+                                className="px-8 h-16 bg-gradient-to-r from-indigo-600 to-violet-700 text-white rounded-3xl font-black text-xs uppercase tracking-widest shadow-2xl hover:scale-105 transition-all flex items-center gap-3 border border-white/20"
+                            >
+                                <Shield size={20} />
+                                ADMIN CONSOLE
+                            </Link>
+                        )}
                         {canManage && (
                             <>
                                 <button
