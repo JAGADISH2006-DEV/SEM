@@ -78,6 +78,8 @@ const Dashboard = () => {
     const cloudProvider = useAppStore((state) => state.cloudProvider);
     const openModal = useAppStore((state) => state.openModal);
     const setSelectedEvent = useAppStore((state) => state.setSelectedEvent);
+    const setFilters = useAppStore((state) => state.setFilters);
+    const resetFilters = useAppStore((state) => state.resetFilters);
 
     const [teamMembers, setTeamMembers] = useState([]);
 
@@ -96,8 +98,14 @@ const Dashboard = () => {
     // Dashboard Statistics with useMemo
     const stats = useMemo(() => {
         const total = events.length;
-        const upcomingCount = events.filter(e => isAfter(new Date(e.startDate), new Date())).length;
-        const prizeValues = events.map(e => {
+        const now = new Date();
+        const upcomingEvents = events.filter(e => 
+            isAfter(new Date(e.startDate), now) || 
+            isAfter(new Date(e.registrationDeadline), now)
+        );
+        const upcomingCount = upcomingEvents.length;
+        
+        const prizeValues = upcomingEvents.map(e => {
             const val = parseFloat(String(e.prizeAmount).replace(/[^0-9.]/g, '')) || 0;
             return val;
         });
@@ -237,7 +245,14 @@ const Dashboard = () => {
                     </div>
                 </div>
 
-                <div className="bg-white dark:bg-slate-900 rounded-[2.5rem] p-8 shadow-[0_20px_50px_-15px_rgba(0,0,0,0.05)] border border-slate-100 dark:border-slate-800 relative overflow-hidden group hover:scale-[1.02] transition-transform duration-500">
+                <div 
+                    className="bg-white dark:bg-slate-900 rounded-[2.5rem] p-8 shadow-[0_20px_50px_-15px_rgba(0,0,0,0.05)] border border-slate-100 dark:border-slate-800 relative overflow-hidden group hover:scale-[1.02] transition-transform duration-500 cursor-pointer"
+                    onClick={() => {
+                        resetFilters();
+                        setFilters({ dateRange: 'today' });
+                        navigate('/events');
+                    }}
+                >
                     <div className="absolute -right-4 -top-4 w-32 h-32 bg-rose-50 dark:bg-rose-900/10 rounded-full transition-all group-hover:scale-110" />
                     <div className="flex items-center justify-between mb-8 relative z-10">
                         <div className="w-14 h-14 bg-rose-50 dark:bg-rose-900/30 rounded-2xl flex items-center justify-center">
@@ -247,12 +262,19 @@ const Dashboard = () => {
                     <div className="relative z-10">
                         <h3 className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-1.5">DEADLINES TODAY</h3>
                         <p className="text-4xl font-black text-slate-900 dark:text-white tracking-tighter">
-                            {events.filter(e => isToday(new Date(e.registrationDeadline))).length || 2}
+                            {events.filter(e => isToday(new Date(e.registrationDeadline))).length}
                         </p>
                     </div>
                 </div>
 
-                <div className="bg-white dark:bg-slate-900 rounded-[2.5rem] p-8 shadow-[0_20px_50px_-15px_rgba(0,0,0,0.05)] border border-slate-100 dark:border-slate-800 relative overflow-hidden group hover:scale-[1.02] transition-transform duration-500">
+                <div 
+                    className="bg-white dark:bg-slate-900 rounded-[2.5rem] p-8 shadow-[0_20px_50px_-15px_rgba(0,0,0,0.05)] border border-slate-100 dark:border-slate-800 relative overflow-hidden group hover:scale-[1.02] transition-transform duration-500 cursor-pointer"
+                    onClick={() => {
+                        resetFilters();
+                        setFilters({ dateRange: 'week' });
+                        navigate('/events');
+                    }}
+                >
                     <div className="absolute -right-4 -top-4 w-32 h-32 bg-emerald-50 dark:bg-emerald-900/10 rounded-full transition-all group-hover:scale-110" />
                     <div className="flex items-center justify-between mb-8 relative z-10">
                         <div className="w-14 h-14 bg-emerald-50 dark:bg-emerald-900/30 rounded-2xl flex items-center justify-center">
@@ -265,7 +287,7 @@ const Dashboard = () => {
                     <div className="relative z-10">
                         <h3 className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-1.5">EVENTS THIS WEEK</h3>
                         <p className="text-4xl font-black text-slate-900 dark:text-white tracking-tighter">
-                            {events.filter(e => isThisWeek(new Date(e.startDate))).length || 1}
+                            {events.filter(e => isThisWeek(new Date(e.startDate))).length}
                         </p>
                     </div>
                 </div>
